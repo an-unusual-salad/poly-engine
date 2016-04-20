@@ -1,0 +1,28 @@
+#!/usr/bin/elfsh
+
+#print Number of parameters : $#
+#print Param 1 : $1
+#cmp 1 $#
+#jne bad
+#print Parameter 1  = $1 
+#profile enable warn
+
+b malloc
+display 1 got malloc
+display 1 print Reached breakpoint at malloc !
+
+start
+step
+
+foreach $idx of 0 until 5
+ cont
+forend
+
+print Stepped 5 instructions ! 
+delete 1
+step
+quit
+
+bad:
+print You need a parameter
+quit

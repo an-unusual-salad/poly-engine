@@ -1,0 +1,19 @@
+#!../../../../elfsh/elfsh32
+
+#profile enable warn
+load hijackme64
+load rel.64.o
+
+#profile enable warn
+#log session
+
+reladd 1 2
+#redir puts puts_troj
+redir legit_func hook_func
+
+#sym old
+save fake_aout64
+
+#log stop
+
+quit

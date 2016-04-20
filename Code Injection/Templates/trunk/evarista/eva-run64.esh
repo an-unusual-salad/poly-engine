@@ -1,0 +1,4 @@
+#!evarista64
+
+source eva-main.esh $1
+

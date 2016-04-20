@@ -1,0 +1,7 @@
+#!/usr/bin/elfsh32
+
+load test-jumps
+analyse
+graph
+
+

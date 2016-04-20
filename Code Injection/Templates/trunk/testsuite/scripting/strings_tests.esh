@@ -1,0 +1,49 @@
+#!../../elfsh/elfsh32
+#
+# Second regression test script
+#
+
+#quiet
+
+load /bin/ls
+
+print 	SHT entries 1 and 13:
+s 	01]|13]
+
+print The interpretor section:
+X	interp
+
+print Change section name:
+print 1.section[1].name
+set   1.section[1].name	.pffffffffffff
+print 1.section[1].name
+
+print 20 first bytes of .text:
+X 	 ^\.text%20
+
+print Change 5 first byte of section .text :
+write 	 1.section[.text].raw		hehe\x42
+X 	 ^\.text%20
+
+print Write 9 bytes in section .text, starting at byte 5:
+write 	 1.section[.text:5].raw		\x43\x44\huhu\x00\x48
+X 	 ^\.text%20
+
+print Write the value of printf symbol (4 bytes) at offset 10 (2 * 5)
+write 	 1.section[.text:2%5].raw	printf
+X 	 ^\.text%20
+
+s 	01]|13]
+
+print Change a symbol name
+print 1.symtab[1].name
+set   1.symtab[1].name heh
+print 1.symtab[1].name
+
+print Change a dynamic symbol name
+print 1.dynsym[2].name
+set 1.dynsym[2].name test_big_string_oh_yeah
+print 1.dynsym[2].name
+
+save /tmp/elfsh.modifs
+quit

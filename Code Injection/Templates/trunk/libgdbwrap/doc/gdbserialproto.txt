@@ -1,0 +1,2885 @@
+   [ < ] [ > ]   [ << ] [ Up ] [ >> ]         [Top] [Contents] [Index] [ ?
+   ]
+
+                         D. GDB Remote Serial Protocol
+
+     D.1 Overview
+     D.2 Packets
+     D.3 Stop Reply Packets
+     D.4 General Query Packets
+     D.5 Register Packet Format
+     D.6 Tracepoint Packets
+     D.7 Host I/O Packets
+     D.8 Interrupts
+     D.9 Notification Packets
+     D.10 Remote Protocol Support for Non-Stop Mode
+     D.11 Packet Acknowledgment
+     D.12 Examples
+     D.13 File-I/O Remote Protocol Extension
+     D.14 Library List Format
+     D.15 Memory Map Format
+     __________________________________________________________________
+
+   [ < ] [ > ]   [ << ] [ Up ] [ >> ]         [Top] [Contents] [Index] [ ?
+   ]
+
+D.1 Overview
+
+   There may be occasions when you need to know something about the
+   protocol--for example, if there is only one serial port to your target
+   machine, you might want your program to do something special if it
+   recognizes a packet meant for GDB.
+
+   In the examples below, `->' and `<-' are used to indicate transmitted
+   and received data, respectively.
+
+   All GDB commands and responses (other than acknowledgments and
+   notifications, see D.9 Notification Packets) are sent as a packet. A
+   packet is introduced with the character `$', the actual packet-data,
+   and the terminating character `#' followed by a two-digit checksum:
+
+
+$packet-data#checksum
+
+   The two-digit checksum is computed as the modulo 256 sum of all
+   characters between the leading `$' and the trailing `#' (an eight bit
+   unsigned checksum).
+
+   Implementors should note that prior to GDB 5.0 the protocol
+   specification also included an optional two-digit sequence-id:
+
+
+$sequence-id:packet-data#checksum
+
+   That sequence-id was appended to the acknowledgment. GDB has never
+   output sequence-ids. Stubs that handle packets added since GDB 5.0 must
+   not accept sequence-id.
+
+   When either the host or the target machine receives a packet, the first
+   response expected is an acknowledgment: either `+' (to indicate the
+   package was received correctly) or `-' (to request retransmission):
+
+
+-> $packet-data#checksum
+<- +
+
+   The `+'/`-' acknowledgments can be disabled once a connection is
+   established. See section D.11 Packet Acknowledgment, for details.
+
+   The host (GDB) sends commands, and the target (the debugging stub
+   incorporated in your program) sends a response. In the case of step and
+   continue commands, the response is only sent when the operation has
+   completed, and the target has again stopped all threads in all attached
+   processes. This is the default all-stop mode behavior, but the remote
+   protocol also supports GDB's non-stop execution mode; see D.10 Remote
+   Protocol Support for Non-Stop Mode, for details.
+
+   packet-data consists of a sequence of characters with the exception of
+   `#' and `$' (see `X' packet for additional exceptions).
+
+   Fields within the packet should be separated using `,' `;' or `:'.
+   Except where otherwise noted all numbers are represented in HEX with
+   leading zeros suppressed.
+
+   Implementors should note that prior to GDB 5.0, the character `:' could
+   not appear as the third character in a packet (as it would potentially
+   conflict with the sequence-id).
+
+   Binary data in most packets is encoded either as two hexadecimal digits
+   per byte of binary data. This allowed the traditional remote protocol
+   to work over connections which were only seven-bit clean. Some packets
+   designed more recently assume an eight-bit clean connection, and use a
+   more efficient encoding to send and receive binary data.
+
+   The binary data representation uses 7d (ASCII `}') as an escape
+   character. Any escaped byte is transmitted as the escape character
+   followed by the original character XORed with 0x20. For example, the
+   byte 0x7d would be transmitted as the two bytes 0x7d 0x5d. The bytes
+   0x23 (ASCII `#'), 0x24 (ASCII `$'), and 0x7d (ASCII `}') must always be
+   escaped. Responses sent by the stub must also escape 0x2a (ASCII `*'),
+   so that it is not interpreted as the start of a run-length encoded
+   sequence (described next).
+
+   Response data can be run-length encoded to save space. Run-length
+   encoding replaces runs of identical characters with one instance of the
+   repeated character, followed by a `*' and a repeat count. The repeat
+   count is itself sent encoded, to avoid binary characters in data: a
+   value of n is sent as n+29. For a repeat count greater or equal to 3,
+   this produces a printable ASCII character, e.g. a space (ASCII code 32)
+   for a repeat count of 3. (This is because run-length encoding starts to
+   win for counts 3 or more.) Thus, for example, `0* ' is a run-length
+   encoding of "0000": the space character after `*' means repeat the
+   leading 0 32 - 29 = 3 more times.
+
+   The printable characters `#' and `$' or with a numeric value greater
+   than 126 must not be used. Runs of six repeats (`#') or seven repeats
+   (`$') can be expanded using a repeat count of only five (`"'). For
+   example, `00000000' can be encoded as `0*"00'.
+
+   The error response returned for some packets includes a two character
+   error number. That number is not well defined.
+
+   For any command not supported by the stub, an empty response (`$#00')
+   should be returned. That way it is possible to extend the protocol. A
+   newer GDB can tell if a packet is supported based on that response.
+
+   A stub is required to support the `g', `G', `m', `M', `c', and `s'
+   commands. All other commands are optional.
+     __________________________________________________________________
+
+   [ < ] [ > ]   [ << ] [ Up ] [ >> ]         [Top] [Contents] [Index] [ ?
+   ]
+
+D.2 Packets
+
+   The following table provides a complete list of all currently defined
+   commands and their corresponding response data. See section D.13
+   File-I/O Remote Protocol Extension, for details about the File I/O
+   extension of the remote protocol.
+
+   Each packet's description has a template showing the packet's overall
+   syntax, followed by an explanation of the packet's meaning. We include
+   spaces in some of the templates for clarity; these are not part of the
+   packet's syntax. No GDB packet uses spaces to separate its components.
+   For example, a template like `foo bar baz' describes a packet beginning
+   with the three ASCII bytes `foo', followed by a bar, followed directly
+   by a baz. GDB does not transmit a space character between the `foo' and
+   the bar, or between the bar and the baz.
+
+   Several packets and replies include a thread-id field to identify a
+   thread. Normally these are positive numbers with a target-specific
+   interpretation, formatted as big-endian hex strings. A thread-id can
+   also be a literal `-1' to indicate all threads, or `0' to pick any
+   thread.
+
+   In addition, the remote protocol supports a multiprocess feature in
+   which the thread-id syntax is extended to optionally include both
+   process and thread ID fields, as `ppid.tid'. The pid (process) and tid
+   (thread) components each have the format described above: a positive
+   number with target-specific interpretation formatted as a big-endian
+   hex string, literal `-1' to indicate all processes or threads
+   (respectively), or `0' to indicate an arbitrary process or thread.
+   Specifying just a process, as `ppid', is equivalent to `ppid.-1'. It is
+   an error to specify all processes but a specific thread, such as
+   `p-1.tid'. Note that the `p' prefix is not used for those packets and
+   replies explicitly documented to include a process ID, rather than a
+   thread-id.
+
+   The multiprocess thread-id syntax extensions are only used if both GDB
+   and the stub report support for the `multiprocess' feature using
+   `qSupported'. See multiprocess extensions, for more information.
+
+   Note that all packet forms beginning with an upper- or lower-case
+   letter, other than those described here, are reserved for future use.
+
+   Here are the packet descriptions.
+
+   `!'
+          Enable extended mode. In extended mode, the remote server is
+          made persistent. The `R' packet is used to restart the program
+          being debugged.
+          Reply:
+        `OK'
+               The remote target both supports and has enabled extended
+               mode.
+   `?'
+          Indicate the reason the target halted. The reply is the same as
+          for step and continue. This packet has a special interpretation
+          when the target is in non-stop mode; see D.10 Remote Protocol
+          Support for Non-Stop Mode.
+          Reply: See section D.3 Stop Reply Packets, for the reply
+          specifications.
+   `A arglen,argnum,arg,...'
+          Initialized argv[] array passed into program. arglen specifies
+          the number of bytes in the hex encoded byte stream arg. See
+          gdbserver for more details.
+          Reply:
+        `OK'
+               The arguments were set.
+        `E NN'
+               An error occurred.
+   `b baud'
+          (Don't use this packet; its behavior is not well-defined.)
+          Change the serial line speed to baud.
+          JTC: When does the transport layer state change? When it's
+          received, or after the ACK is transmitted. In either case, there
+          are problems if the command or the acknowledgment packet is
+          dropped.
+          Stan: If people really wanted to add something like this, and
+          get it working for the first time, they ought to modify
+          ser-unix.c to send some kind of out-of-band message to a
+          specially-setup stub and have the switch happen "in between"
+          packets, so that from remote protocol's point of view, nothing
+          actually happened.
+   `B addr,mode'
+          Set (mode is `S') or clear (mode is `C') a breakpoint at addr.
+          Don't use this packet. Use the `Z' and `z' packets instead (see
+          insert breakpoint or watchpoint packet).
+   `bc'
+          Backward continue. Execute the target system in reverse. No
+          parameter. See section 6. Running programs backward, for more
+          information.
+          Reply: See section D.3 Stop Reply Packets, for the reply
+          specifications.
+   `bs'
+          Backward single step. Execute one instruction in reverse. No
+          parameter. See section 6. Running programs backward, for more
+          information.
+          Reply: See section D.3 Stop Reply Packets, for the reply
+          specifications.
+   `c [addr]'
+          Continue. addr is address to resume. If addr is omitted, resume
+          at current address.
+          Reply: See section D.3 Stop Reply Packets, for the reply
+          specifications.
+   `C sig[;addr]'
+          Continue with signal sig (hex signal number). If `;addr' is
+          omitted, resume at same address.
+          Reply: See section D.3 Stop Reply Packets, for the reply
+          specifications.
+   `d'
+          Toggle debug flag.
+          Don't use this packet; instead, define a general set packet (see
+          section D.4 General Query Packets).
+   `D'
+   `D;pid'
+          The first form of the packet is used to detach GDB from the
+          remote system. It is sent to the remote target before GDB
+          disconnects via the detach command.
+          The second form, including a process ID, is used when
+          multiprocess protocol extensions are enabled (see multiprocess
+          extensions), to detach only a specific process. The pid is
+          specified as a big-endian hex string.
+          Reply:
+        `OK'
+               for success
+        `E NN'
+               for an error
+   `F RC,EE,CF;XX'
+          A reply from GDB to an `F' packet sent by the target. This is
+          part of the File-I/O protocol extension. See section D.13
+          File-I/O Remote Protocol Extension, for the specification.
+   `g'
+          Read general registers.
+          Reply:
+        `XX...'
+               Each byte of register data is described by two hex digits.
+               The bytes with the register are transmitted in target byte
+               order. The size of each register and their position within
+               the `g' packet are determined by the GDB internal gdbarch
+               functions DEPRECATED_REGISTER_RAW_SIZE and
+               gdbarch_register_name. The specification of several
+               standard `g' packets is specified below.
+        `E NN'
+               for an error.
+   `G XX...'
+          Write general registers. See read registers packet, for a
+          description of the XX... data.
+          Reply:
+        `OK'
+               for success
+        `E NN'
+               for an error
+   `H c thread-id'
+          Set thread for subsequent operations (`m', `M', `g', `G',
+          et.al.). c depends on the operation to be performed: it should
+          be `c' for step and continue operations, `g' for other
+          operations. The thread designator thread-id has the format and
+          interpretation described in thread-id syntax.
+          Reply:
+        `OK'
+               for success
+        `E NN'
+               for an error
+   `i [addr[,nnn]]'
+          Step the remote target by a single clock cycle. If `,nnn' is
+          present, cycle step nnn cycles. If addr is present, cycle step
+          starting at that address.
+   `I'
+          Signal, then cycle step. See step with signal packet. See cycle
+          step packet.
+   `k'
+          Kill request.
+          FIXME: There is no description of how to operate when a specific
+          thread context has been selected (i.e. does 'k' kill only that
+          thread?).
+   `m addr,length'
+          Read length bytes of memory starting at address addr. Note that
+          addr may not be aligned to any particular boundary.
+          The stub need not use any particular size or alignment when
+          gathering data from memory for the response; even if addr is
+          word-aligned and length is a multiple of the word size, the stub
+          is free to use byte accesses, or not. For this reason, this
+          packet may not be suitable for accessing memory-mapped I/O
+          devices.
+          Reply:
+        `XX...'
+               Memory contents; each byte is transmitted as a two-digit
+               hexadecimal number. The reply may contain fewer bytes than
+               requested if the server was able to read only part of the
+               region of memory.
+        `E NN'
+               NN is errno
+   `M addr,length:XX...'
+          Write length bytes of memory starting at address addr. XX... is
+          the data; each byte is transmitted as a two-digit hexadecimal
+          number.
+          Reply:
+        `OK'
+               for success
+        `E NN'
+               for an error (this includes the case where only part of the
+               data was written).
+   `p n'
+          Read the value of register n; n is in hex. See read registers
+          packet, for a description of how the returned register value is
+          encoded.
+          Reply:
+        `XX...'
+               the register's value
+        `E NN'
+               for an error
+        `'
+               Indicating an unrecognized query.
+   `P n...=r...'
+          Write register n... with value r.... The register number n is in
+          hexadecimal, and r... contains two hex digits for each byte in
+          the register (target byte order).
+          Reply:
+        `OK'
+               for success
+        `E NN'
+               for an error
+   `q name params...'
+   `Q name params...'
+          General query (`q') and set (`Q'). These packets are described
+          fully in D.4 General Query Packets.
+   `r'
+          Reset the entire system.
+          Don't use this packet; use the `R' packet instead.
+   `R XX'
+          Restart the program being debugged. XX, while needed, is
+          ignored. This packet is only available in extended mode (see
+          extended mode).
+          The `R' packet has no reply.
+   `s [addr]'
+          Single step. addr is the address at which to resume. If addr is
+          omitted, resume at same address.
+          Reply: See section D.3 Stop Reply Packets, for the reply
+          specifications.
+   `S sig[;addr]'
+          Step with signal. This is analogous to the `C' packet, but
+          requests a single-step, rather than a normal resumption of
+          execution.
+          Reply: See section D.3 Stop Reply Packets, for the reply
+          specifications.
+   `t addr:PP,MM'
+          Search backwards starting at address addr for a match with
+          pattern PP and mask MM. PP and MM are 4 bytes. addr must be at
+          least 3 digits.
+   `T thread-id'
+          Find out if the thread thread-id is alive. See thread-id syntax.
+          Reply:
+        `OK'
+               thread is still alive
+        `E NN'
+               thread is dead
+   `v'
+          Packets starting with `v' are identified by a multi-letter name,
+          up to the first `;' or `?' (or the end of the packet).
+   `vAttach;pid'
+          Attach to a new process with the specified process ID pid. The
+          process ID is a hexadecimal integer identifying the process. In
+          all-stop mode, all threads in the attached process are stopped;
+          in non-stop mode, it may be attached without being stopped if
+          that is supported by the target.
+          This packet is only available in extended mode (see extended
+          mode).
+          Reply:
+        `E nn'
+               for an error
+        `Any stop packet'
+               for success in all-stop mode (see section D.3 Stop Reply
+               Packets)
+        `OK'
+               for success in non-stop mode (see section D.10 Remote
+               Protocol Support for Non-Stop Mode)
+   `vCont[;action[:thread-id]]...'
+          Resume the inferior, specifying different actions for each
+          thread. If an action is specified with no thread-id, then it is
+          applied to any threads that don't have a specific action
+          specified; if no default action is specified then other threads
+          should remain stopped in all-stop mode and in their current
+          state in non-stop mode. Specifying multiple default actions is
+          an error; specifying no actions is also an error. Thread IDs are
+          specified using the syntax described in thread-id syntax.
+          Currently supported actions are:
+        `c'
+               Continue.
+        `C sig'
+               Continue with signal sig. The signal sig should be two hex
+               digits.
+        `s'
+               Step.
+        `S sig'
+               Step with signal sig. The signal sig should be two hex
+               digits.
+        `t'
+               Stop.
+        `T sig'
+               Stop with signal sig. The signal sig should be two hex
+               digits.
+          The optional argument addr normally associated with the `c',
+          `C', `s', and `S' packets is not supported in `vCont'.
+          The `t' and `T' actions are only relevant in non-stop mode (see
+          section D.10 Remote Protocol Support for Non-Stop Mode) and may
+          be ignored by the stub otherwise. A stop reply should be
+          generated for any affected thread not already stopped. When a
+          thread is stopped by means of a `t' action, the corresponding
+          stop reply should indicate that the thread has stopped with
+          signal `0', regardless of whether the target uses some other
+          signal as an implementation detail.
+          Reply: See section D.3 Stop Reply Packets, for the reply
+          specifications.
+   `vCont?'
+          Request a list of actions supported by the `vCont' packet.
+          Reply:
+        `vCont[;action...]'
+               The `vCont' packet is supported. Each action is a supported
+               command in the `vCont' packet.
+        `'
+               The `vCont' packet is not supported.
+   `vFile:operation:parameter...'
+          Perform a file operation on the target system. For details, see
+          D.7 Host I/O Packets.
+   `vFlashErase:addr,length'
+          Direct the stub to erase length bytes of flash starting at addr.
+          The region may enclose any number of flash blocks, but its start
+          and end must fall on block boundaries, as indicated by the flash
+          block size appearing in the memory map (see section D.15 Memory
+          Map Format). GDB groups flash memory programming operations
+          together, and sends a `vFlashDone' request after each group; the
+          stub is allowed to delay erase operation until the `vFlashDone'
+          packet is received.
+          The stub must support `vCont' if it reports support for
+          multiprocess extensions (see multiprocess extensions). Note that
+          in this case `vCont' actions can be specified to apply to all
+          threads in a process by using the `ppid.-1' form of the
+          thread-id.
+          Reply:
+        `OK'
+               for success
+        `E NN'
+               for an error
+   `vFlashWrite:addr:XX...'
+          Direct the stub to write data to flash address addr. The data is
+          passed in binary form using the same encoding as for the `X'
+          packet (see Binary Data). The memory ranges specified by
+          `vFlashWrite' packets preceding a `vFlashDone' packet must not
+          overlap, and must appear in order of increasing addresses
+          (although `vFlashErase' packets for higher addresses may already
+          have been received; the ordering is guaranteed only between
+          `vFlashWrite' packets). If a packet writes to an address that
+          was neither erased by a preceding `vFlashErase' packet nor by
+          some other target-specific method, the results are
+          unpredictable.
+          Reply:
+        `OK'
+               for success
+        `E.memtype'
+               for vFlashWrite addressing non-flash memory
+        `E NN'
+               for an error
+   `vFlashDone'
+          Indicate to the stub that flash programming operation is
+          finished. The stub is permitted to delay or batch the effects of
+          a group of `vFlashErase' and `vFlashWrite' packets until a
+          `vFlashDone' packet is received. The contents of the affected
+          regions of flash memory are unpredictable until the `vFlashDone'
+          request is completed.
+   `vKill;pid'
+          Kill the process with the specified process ID. pid is a
+          hexadecimal integer identifying the process. This packet is used
+          in preference to `k' when multiprocess protocol extensions are
+          supported; see multiprocess extensions.
+          Reply:
+        `E nn'
+               for an error
+        `OK'
+               for success
+   `vRun;filename[;argument]...'
+          Run the program filename, passing it each argument on its
+          command line. The file and arguments are hex-encoded strings. If
+          filename is an empty string, the stub may use a default program
+          (e.g. the last program run). The program is created in the
+          stopped state.
+          This packet is only available in extended mode (see extended
+          mode).
+          Reply:
+        `E nn'
+               for an error
+        `Any stop packet'
+               for success (see section D.3 Stop Reply Packets)
+   `vStopped'
+          In non-stop mode (see section D.10 Remote Protocol Support for
+          Non-Stop Mode), acknowledge a previous stop reply and prompt for
+          the stub to report another one.
+          Reply:
+        `Any stop packet'
+               if there is another unreported stop event (see section D.3
+               Stop Reply Packets)
+        `OK'
+               if there are no unreported stop events
+   `X addr,length:XX...'
+          Write data to memory, where the data is transmitted in binary.
+          addr is address, length is number of bytes, `XX...' is binary
+          data (see Binary Data).
+          Reply:
+        `OK'
+               for success
+        `E NN'
+               for an error
+   `z type,addr,length'
+   `Z type,addr,length'
+          Insert (`Z') or remove (`z') a type breakpoint or watchpoint
+          starting at address address and covering the next length bytes.
+          Each breakpoint and watchpoint packet type is documented
+          separately.
+          Implementation notes: A remote target shall return an empty
+          string for an unrecognized breakpoint or watchpoint packet type.
+          A remote target shall support either both or neither of a given
+          `Ztype...' and `ztype...' packet pair. To avoid potential
+          problems with duplicate packets, the operations should be
+          implemented in an idempotent way.
+   `z0,addr,length'
+   `Z0,addr,length'
+          Insert (`Z0') or remove (`z0') a memory breakpoint at address
+          addr of size length.
+          A memory breakpoint is implemented by replacing the instruction
+          at addr with a software breakpoint or trap instruction. The
+          length is used by targets that indicates the size of the
+          breakpoint (in bytes) that should be inserted (e.g., the ARM and
+          MIPS can insert either a 2 or 4 byte breakpoint).
+          Implementation note: It is possible for a target to copy or move
+          code that contains memory breakpoints (e.g., when implementing
+          overlays). The behavior of this packet, in the presence of such
+          a target, is not defined.
+          Reply:
+        `OK'
+               success
+        `'
+               not supported
+        `E NN'
+               for an error
+   `z1,addr,length'
+   `Z1,addr,length'
+          Insert (`Z1') or remove (`z1') a hardware breakpoint at address
+          addr of size length.
+          A hardware breakpoint is implemented using a mechanism that is
+          not dependant on being able to modify the target's memory.
+          Implementation note: A hardware breakpoint is not affected by
+          code movement.
+          Reply:
+        `OK'
+               success
+        `'
+               not supported
+        `E NN'
+               for an error
+   `z2,addr,length'
+   `Z2,addr,length'
+          Insert (`Z2') or remove (`z2') a write watchpoint.
+          Reply:
+        `OK'
+               success
+        `'
+               not supported
+        `E NN'
+               for an error
+   `z3,addr,length'
+   `Z3,addr,length'
+          Insert (`Z3') or remove (`z3') a read watchpoint.
+          Reply:
+        `OK'
+               success
+        `'
+               not supported
+        `E NN'
+               for an error
+   `z4,addr,length'
+   `Z4,addr,length'
+          Insert (`Z4') or remove (`z4') an access watchpoint.
+          Reply:
+        `OK'
+               success
+        `'
+               not supported
+        `E NN'
+               for an error
+     __________________________________________________________________
+
+   [ < ] [ > ]   [ << ] [ Up ] [ >> ]         [Top] [Contents] [Index] [ ?
+   ]
+
+D.3 Stop Reply Packets
+
+   The `C', `c', `S', `s', `vCont', `vAttach', `vRun', `vStopped', and `?'
+   packets can receive any of the below as a reply. Except for `?' and
+   `vStopped', that reply is only returned when the target halts. In the
+   below the exact meaning of signal number is defined by the header
+   `include/gdb/signals.h' in the GDB source code.
+
+   As in the description of request packets, we include spaces in the
+   reply templates for clarity; these are not part of the reply packet's
+   syntax. No GDB stop reply packet uses spaces to separate its
+   components.
+
+   `S AA'
+          The program received signal number AA (a two-digit hexadecimal
+          number). This is equivalent to a `T' response with no n:r pairs.
+   `T AA n1:r1;n2:r2;...'
+          The program received signal number AA (a two-digit hexadecimal
+          number). This is equivalent to an `S' response, except that the
+          `n:r' pairs can carry values of important registers and other
+          information directly in the stop reply packet, reducing
+          round-trip latency. Single-step and breakpoint traps are
+          reported this way. Each `n:r' pair is interpreted as follows:
+          + If n is a hexadecimal number, it is a register number, and the
+            corresponding r gives that register's value. r is a series of
+            bytes in target byte order, with each byte given by a
+            two-digit hex number.
+          + If n is `thread', then r is the thread-id of the stopped
+            thread, as specified in thread-id syntax.
+          + If n is a recognized stop reason, it describes a more specific
+            event that stopped the target. The currently defined stop
+            reasons are listed below. aa should be `05', the trap signal.
+            At most one stop reason should be present.
+          + Otherwise, GDB should ignore this `n:r' pair and go on to the
+            next; this allows us to extend the protocol in the future.
+          The currently defined stop reasons are:
+        `watch'
+        `rwatch'
+        `awatch'
+               The packet indicates a watchpoint hit, and r is the data
+               address, in hex.
+        `library'
+               The packet indicates that the loaded libraries have
+               changed. GDB should use `qXfer:libraries:read' to fetch a
+               new list of loaded libraries. r is ignored.
+        `replaylog'
+               The packet indicates that the target cannot continue
+               replaying logged execution events, because it has reached
+               the end (or the beginning when executing backward) of the
+               log. The value of r will be either `begin' or `end'. See
+               section 6. Running programs backward, for more information.
+   `W AA'
+   `W AA ; process:pid'
+          The process exited, and AA is the exit status. This is only
+          applicable to certain targets.
+          The second form of the response, including the process ID of the
+          exited process, can be used only when GDB has reported support
+          for multiprocess protocol extensions; see multiprocess
+          extensions. The pid is formatted as a big-endian hex string.
+   `X AA'
+   `X AA ; process:pid'
+          The process terminated with signal AA.
+          The second form of the response, including the process ID of the
+          terminated process, can be used only when GDB has reported
+          support for multiprocess protocol extensions; see multiprocess
+          extensions. The pid is formatted as a big-endian hex string.
+   `O XX...'
+          `XX...' is hex encoding of ASCII data, to be written as the
+          program's console output. This can happen at any time while the
+          program is running and the debugger should continue to wait for
+          `W', `T', etc. This reply is not permitted in non-stop mode.
+   `F call-id,parameter...'
+          call-id is the identifier which says which host system call
+          should be called. This is just the name of the function.
+          Translation into the correct system call is only applicable as
+          it's defined in GDB. See section D.13 File-I/O Remote Protocol
+          Extension, for a list of implemented system calls.
+          `parameter...' is a list of parameters as defined for this very
+          system call.
+          The target replies with this packet when it expects GDB to call
+          a host system call on behalf of the target. GDB replies with an
+          appropriate `F' packet and keeps up waiting for the next reply
+          packet from the target. The latest `C', `c', `S' or `s' action
+          is expected to be continued. See section D.13 File-I/O Remote
+          Protocol Extension, for more details.
+     __________________________________________________________________
+
+   [ < ] [ > ]   [ << ] [ Up ] [ >> ]         [Top] [Contents] [Index] [ ?
+   ]
+
+D.4 General Query Packets
+
+   Packets starting with `q' are general query packets; packets starting
+   with `Q' are general set packets. General query and set packets are a
+   semi-unified form for retrieving and sending information to and from
+   the stub.
+
+   The initial letter of a query or set packet is followed by a name
+   indicating what sort of thing the packet applies to. For example, GDB
+   may use a `qSymbol' packet to exchange symbol definitions with the
+   stub. These packet names follow some conventions:
+
+     * The name must not contain commas, colons or semicolons.
+     * Most GDB query and set packets have a leading upper case letter.
+     * The names of custom vendor packets should use a company prefix, in
+       lower case, followed by a period. For example, packets designed at
+       the Acme Corporation might begin with `qacme.foo' (for querying
+       foos) or `Qacme.bar' (for setting bars).
+
+   The name of a query or set packet should be separated from any
+   parameters by a `:'; the parameters themselves should be separated by
+   `,' or `;'. Stubs must be careful to match the full packet name, and
+   check for a separator or the end of the packet, in case two packet
+   names share a common prefix. New packets should not begin with `qC',
+   `qP', or `qL'(14).
+
+   Like the descriptions of the other packets, each description here has a
+   template showing the packet's overall syntax, followed by an
+   explanation of the packet's meaning. We include spaces in some of the
+   templates for clarity; these are not part of the packet's syntax. No
+   GDB packet uses spaces to separate its components.
+
+   Here are the currently defined query and set packets:
+
+   `qC'
+          Return the current thread ID.
+          Reply:
+        `QC thread-id'
+               Where thread-id is a thread ID as documented in thread-id
+               syntax.
+        `(anything else)'
+               Any other reply implies the old thread ID.
+   `qCRC:addr,length'
+          Compute the CRC checksum of a block of memory. Reply:
+        `E NN'
+               An error (such as memory fault)
+        `C crc32'
+               The specified memory region's checksum is crc32.
+   `qfThreadInfo'
+   `qsThreadInfo'
+          Obtain a list of all active thread IDs from the target (OS).
+          Since there may be too many active threads to fit into one reply
+          packet, this query works iteratively: it may require more than
+          one query/reply sequence to obtain the entire list of threads.
+          The first query of the sequence will be the `qfThreadInfo'
+          query; subsequent queries in the sequence will be the
+          `qsThreadInfo' query.
+          NOTE: This packet replaces the `qL' query (see below).
+          Reply:
+        `m thread-id'
+               A single thread ID
+        `m thread-id,thread-id...'
+               a comma-separated list of thread IDs
+        `l'
+               (lower case letter `L') denotes end of list.
+          In response to each query, the target will reply with a list of
+          one or more thread IDs, separated by commas. GDB will respond to
+          each reply with a request for more thread ids (using the `qs'
+          form of the query), until the target responds with `l'
+          (lower-case el, for last). Refer to thread-id syntax, for the
+          format of the thread-id fields.
+   `qGetTLSAddr:thread-id,offset,lm'
+          Fetch the address associated with thread local storage specified
+          by thread-id, offset, and lm.
+          thread-id is the thread ID associated with the thread for which
+          to fetch the TLS address. See thread-id syntax.
+          offset is the (big endian, hex encoded) offset associated with
+          the thread local variable. (This offset is obtained from the
+          debug information associated with the variable.)
+          lm is the (big endian, hex encoded) OS/ABI-specific encoding of
+          the the load module associated with the thread local storage.
+          For example, a GNU/Linux system will pass the link map address
+          of the shared object associated with the thread local storage
+          under consideration. Other operating environments may choose to
+          represent the load module differently, so the precise meaning of
+          this parameter will vary.
+          Reply:
+        `XX...'
+               Hex encoded (big endian) bytes representing the address of
+               the thread local storage requested.
+        `E nn'
+               An error occurred. nn are hex digits.
+        `'
+               An empty reply indicates that `qGetTLSAddr' is not
+               supported by the stub.
+   `qL startflag threadcount nextthread'
+          Obtain thread information from RTOS. Where: startflag (one hex
+          digit) is one to indicate the first query and zero to indicate a
+          subsequent query; threadcount (two hex digits) is the maximum
+          number of threads the response packet can contain; and
+          nextthread (eight hex digits), for subsequent queries (startflag
+          is zero), is returned in the response as argthread.
+          Don't use this packet; use the `qfThreadInfo' query instead (see
+          above).
+          Reply:
+        `qM count done argthread thread...'
+               Where: count (two hex digits) is the number of threads
+               being returned; done (one hex digit) is zero to indicate
+               more threads and one indicates no further threads;
+               argthreadid (eight hex digits) is nextthread from the
+               request packet; thread... is a sequence of thread IDs from
+               the target. threadid (eight hex digits). See
+               remote.c:parse_threadlist_response().
+   `qOffsets'
+          Get section offsets that the target used when relocating the
+          downloaded image.
+          Reply:
+        `Text=xxx;Data=yyy[;Bss=zzz]'
+               Relocate the Text section by xxx from its original address.
+               Relocate the Data section by yyy from its original address.
+               If the object file format provides segment information
+               (e.g. ELF `PT_LOAD' program headers), GDB will relocate
+               entire segments by the supplied offsets.
+               Note: while a Bss offset may be included in the response,
+               GDB ignores this and instead applies the Data offset to the
+               Bss section.
+        `TextSeg=xxx[;DataSeg=yyy]'
+               Relocate the first segment of the object file, which
+               conventionally contains program code, to a starting address
+               of xxx. If `DataSeg' is specified, relocate the second
+               segment, which conventionally contains modifiable data, to
+               a starting address of yyy. GDB will report an error if the
+               object file does not contain segment information, or does
+               not contain at least as many segments as mentioned in the
+               reply. Extra segments are kept at fixed offsets relative to
+               the last relocated segment.
+   `qP mode thread-id'
+          Returns information on thread-id. Where: mode is a hex encoded
+          32 bit mode; thread-id is a thread ID (see thread-id syntax).
+          Don't use this packet; use the `qThreadExtraInfo' query instead
+          (see below).
+          Reply: see remote.c:remote_unpack_thread_info_response().
+   `QNonStop:1'
+   `QNonStop:0'
+          Enter non-stop (`QNonStop:1') or all-stop (`QNonStop:0') mode.
+          See section D.10 Remote Protocol Support for Non-Stop Mode, for
+          more information.
+          Reply:
+        `OK'
+               The request succeeded.
+        `E nn'
+               An error occurred. nn are hex digits.
+        `'
+               An empty reply indicates that `QNonStop' is not supported
+               by the stub.
+          This packet is not probed by default; the remote stub must
+          request it, by supplying an appropriate `qSupported' response
+          (see qSupported). Use of this packet is controlled by the set
+          non-stop command; see section 5.4.2 Non-Stop Mode.
+   `QPassSignals: signal [;signal]...'
+          Each listed signal should be passed directly to the inferior
+          process. Signals are numbered identically to continue packets
+          and stop replies (see section D.3 Stop Reply Packets). Each
+          signal list item should be strictly greater than the previous
+          item. These signals do not need to stop the inferior, or be
+          reported to GDB. All other signals should be reported to GDB.
+          Multiple `QPassSignals' packets do not combine; any earlier
+          `QPassSignals' list is completely replaced by the new list. This
+          packet improves performance when using `handle signal nostop
+          noprint pass'.
+          Reply:
+        `OK'
+               The request succeeded.
+        `E nn'
+               An error occurred. nn are hex digits.
+        `'
+               An empty reply indicates that `QPassSignals' is not
+               supported by the stub.
+          Use of this packet is controlled by the set remote pass-signals
+          command (see section set remote pass-signals). This packet is
+          not probed by default; the remote stub must request it, by
+          supplying an appropriate `qSupported' response (see qSupported).
+   `qRcmd,command'
+          command (hex encoded) is passed to the local interpreter for
+          execution. Invalid commands should be reported using the output
+          string. Before the final result packet, the target may also
+          respond with a number of intermediate `Ooutput' console output
+          packets. Implementors should note that providing access to a
+          stubs's interpreter may have security implications.
+          Reply:
+        `OK'
+               A command response with no output.
+        `OUTPUT'
+               A command response with the hex encoded output string
+               OUTPUT.
+        `E NN'
+               Indicate a badly formed request.
+        `'
+               An empty reply indicates that `qRcmd' is not recognized.
+          (Note that the qRcmd packet's name is separated from the command
+          by a `,', not a `:', contrary to the naming conventions above.
+          Please don't use this packet as a model for new packets.)
+   `qSearch:memory:address;length;search-pattern'
+          Search length bytes at address for search-pattern. address and
+          length are encoded in hex. search-pattern is a sequence of
+          bytes, hex encoded.
+          Reply:
+        `0'
+               The pattern was not found.
+        `1,address'
+               The pattern was found at address.
+        `E NN'
+               A badly formed request or an error was encountered while
+               searching memory.
+        `'
+               An empty reply indicates that `qSearch:memory' is not
+               recognized.
+   `QStartNoAckMode'
+          Request that the remote stub disable the normal `+'/`-' protocol
+          acknowledgments (see section D.11 Packet Acknowledgment).
+          Reply:
+        `OK'
+               The stub has switched to no-acknowledgment mode. GDB
+               acknowledges this reponse, but neither the stub nor GDB
+               shall send or expect further `+'/`-' acknowledgments in the
+               current connection.
+        `'
+               An empty reply indicates that the stub does not support
+               no-acknowledgment mode.
+   `qSupported [:gdbfeature [;gdbfeature]... ]'
+          Tell the remote stub about features supported by GDB, and query
+          the stub for features it supports. This packet allows GDB and
+          the remote stub to take advantage of each others' features.
+          `qSupported' also consolidates multiple feature probes at
+          startup, to improve GDB performance--a single larger packet
+          performs better than multiple smaller probe packets on
+          high-latency links. Some features may enable behavior which must
+          not be on by default, e.g. because it would confuse older
+          clients or stubs. Other features may describe packets which
+          could be automatically probed for, but are not. These features
+          must be reported before GDB will use them. This "default
+          unsupported" behavior is not appropriate for all packets, but it
+          helps to keep the initial connection time under control with new
+          versions of GDB which support increasing numbers of packets.
+          Reply:
+        `stubfeature [;stubfeature]...'
+               The stub supports or does not support each returned
+               stubfeature, depending on the form of each stubfeature (see
+               below for the possible forms).
+        `'
+               An empty reply indicates that `qSupported' is not
+               recognized, or that no features needed to be reported to
+               GDB.
+          The allowed forms for each feature (either a gdbfeature in the
+          `qSupported' packet, or a stubfeature in the response) are:
+        `name=value'
+               The remote protocol feature name is supported, and
+               associated with the specified value. The format of value
+               depends on the feature, but it must not include a
+               semicolon.
+        `name+'
+               The remote protocol feature name is supported, and does not
+               need an associated value.
+        `name-'
+               The remote protocol feature name is not supported.
+        `name?'
+               The remote protocol feature name may be supported, and GDB
+               should auto-detect support in some other way when it is
+               needed. This form will not be used for gdbfeature
+               notifications, but may be used for stubfeature responses.
+          Whenever the stub receives a `qSupported' request, the supplied
+          set of GDB features should override any previous request. This
+          allows GDB to put the stub in a known state, even if the stub
+          had previously been communicating with a different version of
+          GDB.
+          The following values of gdbfeature (for the packet sent by GDB)
+          are defined:
+        `multiprocess'
+               This feature indicates whether GDB supports multiprocess
+               extensions to the remote protocol. GDB does not use such
+               extensions unless the stub also reports that it supports
+               them by including `multiprocess+' in its `qSupported'
+               reply. See multiprocess extensions, for details.
+          Stubs should ignore any unknown values for gdbfeature. Any GDB
+          which sends a `qSupported' packet supports receiving packets of
+          unlimited length (earlier versions of GDB may reject overly long
+          responses). Additional values for gdbfeature may be defined in
+          the future to let the stub take advantage of new features in
+          GDB, e.g. incompatible improvements in the remote protocol--the
+          `multiprocess' feature is an example of such a feature. The
+          stub's reply should be independent of the gdbfeature entries
+          sent by GDB; first GDB describes all the features it supports,
+          and then the stub replies with all the features it supports.
+          Similarly, GDB will silently ignore unrecognized stub feature
+          responses, as long as each response uses one of the standard
+          forms.
+          Some features are flags. A stub which supports a flag feature
+          should respond with a `+' form response. Other features require
+          values, and the stub should respond with an `=' form response.
+          Each feature has a default value, which GDB will use if
+          `qSupported' is not available or if the feature is not mentioned
+          in the `qSupported' response. The default values are fixed; a
+          stub is free to omit any feature responses that match the
+          defaults.
+          Not all features can be probed, but for those which can, the
+          probing mechanism is useful: in some cases, a stub's internal
+          architecture may not allow the protocol layer to know some
+          information about the underlying target in advance. This is
+          especially common in stubs which may be configured for multiple
+          targets.
+          These are the currently defined stub features and their
+          properties:
+
+          Feature Name
+          Value Required         Default Probe Allowed
+          `PacketSize'
+          Yes                    `-'     No
+          `qXfer:auxv:read'
+          No                     `-'     Yes
+          `qXfer:features:read'
+          No                     `-'     Yes
+          `qXfer:libraries:read'
+          No                     `-'     Yes
+          `qXfer:memory-map:read'
+          No                     `-'     Yes
+          `qXfer:spu:read'
+          No                     `-'     Yes
+          `qXfer:spu:write'
+          No                     `-'     Yes
+          `qXfer:siginfo:read'
+          No                     `-'     Yes
+          `qXfer:siginfo:write'
+          No                     `-'     Yes
+          `QNonStop'
+          No                     `-'     Yes
+          `QPassSignals'
+          No                     `-'     Yes
+          `QStartNoAckMode'
+          No                     `-'     Yes
+          `multiprocess'
+          No                     `-'     No
+          These are the currently defined stub features, in more detail:
+        `PacketSize=bytes'
+               The remote stub can accept packets up to at least bytes in
+               length. GDB will send packets up to this size for bulk
+               transfers, and will never send larger packets. This is a
+               limit on the data characters in the packet, including the
+               frame and checksum. There is no trailing NUL byte in a
+               remote protocol packet; if the stub stores packets in a
+               NUL-terminated format, it should allow an extra byte in its
+               buffer for the NUL. If this stub feature is not supported,
+               GDB guesses based on the size of the `g' packet response.
+        `qXfer:auxv:read'
+               The remote stub understands the `qXfer:auxv:read' packet
+               (see qXfer auxiliary vector read).
+        `qXfer:features:read'
+               The remote stub understands the `qXfer:features:read'
+               packet (see qXfer target description read).
+        `qXfer:libraries:read'
+               The remote stub understands the `qXfer:libraries:read'
+               packet (see qXfer library list read).
+        `qXfer:memory-map:read'
+               The remote stub understands the `qXfer:memory-map:read'
+               packet (see qXfer memory map read).
+        `qXfer:spu:read'
+               The remote stub understands the `qXfer:spu:read' packet
+               (see qXfer spu read).
+        `qXfer:spu:write'
+               The remote stub understands the `qXfer:spu:write' packet
+               (see qXfer spu write).
+        `qXfer:siginfo:read'
+               The remote stub understands the `qXfer:siginfo:read' packet
+               (see qXfer siginfo read).
+        `qXfer:siginfo:write'
+               The remote stub understands the `qXfer:siginfo:write'
+               packet (see qXfer siginfo write).
+        `QNonStop'
+               The remote stub understands the `QNonStop' packet (see
+               QNonStop).
+        `QPassSignals'
+               The remote stub understands the `QPassSignals' packet (see
+               QPassSignals).
+        `QStartNoAckMode'
+               The remote stub understands the `QStartNoAckMode' packet
+               and prefers to operate in no-acknowledgment mode. See
+               section D.11 Packet Acknowledgment.
+        `multiprocess'
+               The remote stub understands the multiprocess extensions to
+               the remote protocol syntax. The multiprocess extensions
+               affect the syntax of thread IDs in both packets and replies
+               (see thread-id syntax), and add process IDs to the `D'
+               packet and `W' and `X' replies. Note that reporting this
+               feature indicates support for the syntactic extensions
+               only, not that the stub necessarily supports debugging of
+               more than one process at a time. The stub must not use
+               multiprocess extensions in packet replies unless GDB has
+               also indicated it supports them in its `qSupported'
+               request.
+        `qXfer:osdata:read'
+               The remote stub understands the `qXfer:osdata:read' packet
+               ((see qXfer osdata read).
+   `qSymbol::'
+          Notify the target that GDB is prepared to serve symbol lookup
+          requests. Accept requests from the target for the values of
+          symbols.
+          Reply:
+        `OK'
+               The target does not need to look up any (more) symbols.
+        `qSymbol:sym_name'
+               The target requests the value of symbol sym_name (hex
+               encoded). GDB may provide the value by using the
+               `qSymbol:sym_value:sym_name' message, described below.
+   `qSymbol:sym_value:sym_name'
+          Set the value of sym_name to sym_value.
+          sym_name (hex encoded) is the name of a symbol whose value the
+          target has previously requested.
+          sym_value (hex) is the value for symbol sym_name. If GDB cannot
+          supply a value for sym_name, then this field will be empty.
+          Reply:
+        `OK'
+               The target does not need to look up any (more) symbols.
+        `qSymbol:sym_name'
+               The target requests the value of a new symbol sym_name (hex
+               encoded). GDB will continue to supply the values of symbols
+               (if available), until the target ceases to request them.
+   `QTDP'
+   `QTFrame'
+          See section D.6 Tracepoint Packets.
+   `qThreadExtraInfo,thread-id'
+          Obtain a printable string description of a thread's attributes
+          from the target OS. thread-id is a thread ID; see thread-id
+          syntax. This string may contain anything that the target OS
+          thinks is interesting for GDB to tell the user about the thread.
+          The string is displayed in GDB's info threads display. Some
+          examples of possible thread extra info strings are `Runnable',
+          or `Blocked on Mutex'.
+          Reply:
+        `XX...'
+               Where `XX...' is a hex encoding of ASCII data, comprising
+               the printable string containing the extra information about
+               the thread's attributes.
+          (Note that the qThreadExtraInfo packet's name is separated from
+          the command by a `,', not a `:', contrary to the naming
+          conventions above. Please don't use this packet as a model for
+          new packets.)
+   `QTStart'
+   `QTStop'
+   `QTinit'
+   `QTro'
+   `qTStatus'
+          See section D.6 Tracepoint Packets.
+   `qXfer:object:read:annex:offset,length'
+          Read uninterpreted bytes from the target's special data area
+          identified by the keyword object. Request length bytes starting
+          at offset bytes into the data. The content and encoding of annex
+          is specific to object; it can supply additional details about
+          what data to access.
+          Here are the specific requests of this form defined so far. All
+          `qXfer:object:read:...' requests use the same reply formats,
+          listed below.
+        `qXfer:auxv:read::offset,length'
+               Access the target's auxiliary vector. See section auxiliary
+               vector. Note annex must be empty.
+               This packet is not probed by default; the remote stub must
+               request it, by supplying an appropriate `qSupported'
+               response (see qSupported).
+        `qXfer:features:read:annex:offset,length'
+               Access the target description. See section F. Target
+               Descriptions. The annex specifies which XML document to
+               access. The main description is always loaded from the
+               `target.xml' annex.
+               This packet is not probed by default; the remote stub must
+               request it, by supplying an appropriate `qSupported'
+               response (see qSupported).
+        `qXfer:libraries:read:annex:offset,length'
+               Access the target's list of loaded libraries. See section
+               D.14 Library List Format. The annex part of the generic
+               `qXfer' packet must be empty (see qXfer read).
+               Targets which maintain a list of libraries in the program's
+               memory do not need to implement this packet; it is designed
+               for platforms where the operating system manages the list
+               of loaded libraries.
+               This packet is not probed by default; the remote stub must
+               request it, by supplying an appropriate `qSupported'
+               response (see qSupported).
+        `qXfer:memory-map:read::offset,length'
+               Access the target's memory-map. See section D.15 Memory Map
+               Format. The annex part of the generic `qXfer' packet must
+               be empty (see qXfer read).
+               This packet is not probed by default; the remote stub must
+               request it, by supplying an appropriate `qSupported'
+               response (see qSupported).
+        `qXfer:siginfo:read::offset,length'
+               Read contents of the extra signal information on the target
+               system. The annex part of the generic `qXfer' packet must
+               be empty (see qXfer read).
+               This packet is not probed by default; the remote stub must
+               request it, by supplying an appropriate `qSupported'
+               response (see qSupported).
+        `qXfer:spu:read:annex:offset,length'
+               Read contents of an spufs file on the target system. The
+               annex specifies which file to read; it must be of the form
+               `id/name', where id specifies an SPU context ID in the
+               target process, and name identifes the spufs file in that
+               context to be accessed.
+               This packet is not probed by default; the remote stub must
+               request it, by supplying an appropriate `qSupported'
+               response (see qSupported).
+        `qXfer:osdata:read::offset,length'
+               Access the target's operating system information. See
+               section G. Operating System Information.
+          Reply:
+        `m data'
+               Data data (see Binary Data) has been read from the target.
+               There may be more data at a higher address (although it is
+               permitted to return `m' even for the last valid block of
+               data, as long as at least one byte of data was read). data
+               may have fewer bytes than the length in the request.
+        `l data'
+               Data data (see Binary Data) has been read from the target.
+               There is no more data to be read. data may have fewer bytes
+               than the length in the request.
+        `l'
+               The offset in the request is at the end of the data. There
+               is no more data to be read.
+        `E00'
+               The request was malformed, or annex was invalid.
+        `E nn'
+               The offset was invalid, or there was an error encountered
+               reading the data. nn is a hex-encoded errno value.
+        `'
+               An empty reply indicates the object string was not
+               recognized by the stub, or that the object does not support
+               reading.
+   `qXfer:object:write:annex:offset:data...'
+          Write uninterpreted bytes into the target's special data area
+          identified by the keyword object, starting at offset bytes into
+          the data. data... is the binary-encoded data (see Binary Data)
+          to be written. The content and encoding of annex is specific to
+          object; it can supply additional details about what data to
+          access.
+          Here are the specific requests of this form defined so far. All
+          `qXfer:object:write:...' requests use the same reply formats,
+          listed below.
+        `qXfer:siginfo:write::offset:data...'
+               Write data to the extra signal information on the target
+               system. The annex part of the generic `qXfer' packet must
+               be empty (see qXfer write).
+               This packet is not probed by default; the remote stub must
+               request it, by supplying an appropriate `qSupported'
+               response (see qSupported).
+        `qXfer:spu:write:annex:offset:data...'
+               Write data to an spufs file on the target system. The annex
+               specifies which file to write; it must be of the form
+               `id/name', where id specifies an SPU context ID in the
+               target process, and name identifes the spufs file in that
+               context to be accessed.
+               This packet is not probed by default; the remote stub must
+               request it, by supplying an appropriate `qSupported'
+               response (see qSupported).
+          Reply:
+        `nn'
+               nn (hex encoded) is the number of bytes written. This may
+               be fewer bytes than supplied in the request.
+        `E00'
+               The request was malformed, or annex was invalid.
+        `E nn'
+               The offset was invalid, or there was an error encountered
+               writing the data. nn is a hex-encoded errno value.
+        `'
+               An empty reply indicates the object string was not
+               recognized by the stub, or that the object does not support
+               writing.
+   `qXfer:object:operation:...'
+          Requests of this form may be added in the future. When a stub
+          does not recognize the object keyword, or its support for object
+          does not recognize the operation keyword, the stub must respond
+          with an empty packet.
+   `qAttached:pid'
+          Return an indication of whether the remote server attached to an
+          existing process or created a new process. When the multiprocess
+          protocol extensions are supported (see multiprocess extensions),
+          pid is an integer in hexadecimal format identifying the target
+          process. Otherwise, GDB will omit the pid field and the query
+          packet will be simplified as `qAttached'.
+          This query is used, for example, to know whether the remote
+          process should be detached or killed when a GDB session is ended
+          with the quit command.
+          Reply:
+        `1'
+               The remote server attached to an existing process.
+        `0'
+               The remote server created a new process.
+        `E NN'
+               A badly formed request or an error was encountered.
+     __________________________________________________________________
+
+   [ < ] [ > ]   [ << ] [ Up ] [ >> ]         [Top] [Contents] [Index] [ ?
+   ]
+
+D.5 Register Packet Format
+
+   The following g/G packets have previously been defined. In the below,
+   some thirty-two bit registers are transferred as sixty-four bits. Those
+   registers should be zero/sign extended (which?) to fill the space
+   allocated. Register bytes are transferred in target byte order. The two
+   nibbles within a register byte are transferred most-significant -
+   least-significant.
+
+   MIPS32
+          All registers are transferred as thirty-two bit quantities in
+          the order: 32 general-purpose; sr; lo; hi; bad; cause; pc; 32
+          floating-point registers; fsr; fir; fp.
+   MIPS64
+          All registers are transferred as sixty-four bit quantities
+          (including thirty-two bit registers such as sr). The ordering is
+          the same as MIPS32.
+     __________________________________________________________________
+
+   [ < ] [ > ]   [ << ] [ Up ] [ >> ]         [Top] [Contents] [Index] [ ?
+   ]
+
+D.6 Tracepoint Packets
+
+   Here we describe the packets GDB uses to implement tracepoints (see
+   section 11. Tracepoints).
+
+   `QTDP:n:addr:ena:step:pass[-]'
+          Create a new tracepoint, number n, at addr. If ena is `E', then
+          the tracepoint is enabled; if it is `D', then the tracepoint is
+          disabled. step is the tracepoint's step count, and pass is its
+          pass count. If the trailing `-' is present, further `QTDP'
+          packets will follow to specify this tracepoint's actions.
+          Replies:
+        `OK'
+               The packet was understood and carried out.
+        `'
+               The packet was not recognized.
+   `QTDP:-n:addr:[S]action...[-]'
+          Define actions to be taken when a tracepoint is hit. n and addr
+          must be the same as in the initial `QTDP' packet for this
+          tracepoint. This packet may only be sent immediately after
+          another `QTDP' packet that ended with a `-'. If the trailing `-'
+          is present, further `QTDP' packets will follow, specifying more
+          actions for this tracepoint.
+          In the series of action packets for a given tracepoint, at most
+          one can have an `S' before its first action. If such a packet is
+          sent, it and the following packets define "while-stepping"
+          actions. Any prior packets define ordinary actions -- that is,
+          those taken when the tracepoint is first hit. If no action
+          packet has an `S', then all the packets in the series specify
+          ordinary tracepoint actions.
+          The `action...' portion of the packet is a series of actions,
+          concatenated without separators. Each action has one of the
+          following forms:
+        `R mask'
+               Collect the registers whose bits are set in mask. mask is a
+               hexadecimal number whose i'th bit is set if register number
+               i should be collected. (The least significant bit is
+               numbered zero.) Note that mask may be any number of digits
+               long; it may not fit in a 32-bit word.
+        `M basereg,offset,len'
+               Collect len bytes of memory starting at the address in
+               register number basereg, plus offset. If basereg is `-1',
+               then the range has a fixed address: offset is the address
+               of the lowest byte to collect. The basereg, offset, and len
+               parameters are all unsigned hexadecimal values (the `-1'
+               value for basereg is a special case).
+        `X len,expr'
+               Evaluate expr, whose length is len, and collect memory as
+               it directs. expr is an agent expression, as described in E.
+               The GDB Agent Expression Mechanism. Each byte of the
+               expression is encoded as a two-digit hex number in the
+               packet; len is the number of bytes in the expression (and
+               thus one-half the number of hex digits in the packet).
+          Any number of actions may be packed together in a single `QTDP'
+          packet, as long as the packet does not exceed the maximum packet
+          length (400 bytes, for many stubs). There may be only one `R'
+          action per tracepoint, and it must precede any `M' or `X'
+          actions. Any registers referred to by `M' and `X' actions must
+          be collected by a preceding `R' action. (The "while-stepping"
+          actions are treated as if they were attached to a separate
+          tracepoint, as far as these restrictions are concerned.)
+          Replies:
+        `OK'
+               The packet was understood and carried out.
+        `'
+               The packet was not recognized.
+   `QTFrame:n'
+          Select the n'th tracepoint frame from the buffer, and use the
+          register and memory contents recorded there to answer subsequent
+          request packets from GDB.
+          A successful reply from the stub indicates that the stub has
+          found the requested frame. The response is a series of parts,
+          concatenated without separators, describing the frame we
+          selected. Each part has one of the following forms:
+        `F f'
+               The selected frame is number n in the trace frame buffer; f
+               is a hexadecimal number. If f is `-1', then there was no
+               frame matching the criteria in the request packet.
+        `T t'
+               The selected trace frame records a hit of tracepoint number
+               t; t is a hexadecimal number.
+   `QTFrame:pc:addr'
+          Like `QTFrame:n', but select the first tracepoint frame after
+          the currently selected frame whose PC is addr; addr is a
+          hexadecimal number.
+   `QTFrame:tdp:t'
+          Like `QTFrame:n', but select the first tracepoint frame after
+          the currently selected frame that is a hit of tracepoint t; t is
+          a hexadecimal number.
+   `QTFrame:range:start:end'
+          Like `QTFrame:n', but select the first tracepoint frame after
+          the currently selected frame whose PC is between start
+          (inclusive) and end (exclusive); start and end are hexadecimal
+          numbers.
+   `QTFrame:outside:start:end'
+          Like `QTFrame:range:start:end', but select the first frame
+          outside the given range of addresses.
+   `QTStart'
+          Begin the tracepoint experiment. Begin collecting data from
+          tracepoint hits in the trace frame buffer.
+   `QTStop'
+          End the tracepoint experiment. Stop collecting trace frames.
+   `QTinit'
+          Clear the table of tracepoints, and empty the trace frame
+          buffer.
+   `QTro:start1,end1:start2,end2:...'
+          Establish the given ranges of memory as "transparent". The stub
+          will answer requests for these ranges from memory's current
+          contents, if they were not collected as part of the tracepoint
+          hit.
+          GDB uses this to mark read-only regions of memory, like those
+          containing program code. Since these areas never change, they
+          should still have the same contents they did when the tracepoint
+          was hit, so there's no reason for the stub to refuse to provide
+          their contents.
+   `qTStatus'
+          Ask the stub if there is a trace experiment running right now.
+          Replies:
+        `T0'
+               There is no trace experiment running.
+        `T1'
+               There is a trace experiment running.
+     __________________________________________________________________
+
+   [ < ] [ > ]   [ << ] [ Up ] [ >> ]         [Top] [Contents] [Index] [ ?
+   ]
+
+D.7 Host I/O Packets
+
+   The Host I/O packets allow GDB to perform I/O operations on the far
+   side of a remote link. For example, Host I/O is used to upload and
+   download files to a remote target with its own filesystem. Host I/O
+   uses the same constant values and data structure layout as the
+   target-initiated File-I/O protocol. However, the Host I/O packets are
+   structured differently. The target-initiated protocol relies on target
+   memory to store parameters and buffers. Host I/O requests are initiated
+   by GDB, and the target's memory is not involved. See section D.13
+   File-I/O Remote Protocol Extension, for more details on the
+   target-initiated protocol.
+
+   The Host I/O request packets all encode a single operation along with
+   its arguments. They have this format:
+
+   `vFile:operation: parameter...'
+          operation is the name of the particular request; the target
+          should compare the entire packet name up to the second colon
+          when checking for a supported operation. The format of parameter
+          depends on the operation. Numbers are always passed in
+          hexadecimal. Negative numbers have an explicit minus sign (i.e.
+          two's complement is not used). Strings (e.g. filenames) are
+          encoded as a series of hexadecimal bytes. The last argument to a
+          system call may be a buffer of escaped binary data (see Binary
+          Data).
+
+   The valid responses to Host I/O packets are:
+
+   `F result [, errno] [; attachment]'
+          result is the integer value returned by this operation, usually
+          non-negative for success and -1 for errors. If an error has
+          occured, errno will be included in the result. errno will have a
+          value defined by the File-I/O protocol (see section Errno
+          Values). For operations which return data, attachment supplies
+          the data as a binary buffer. Binary buffers in response packets
+          are escaped in the normal way (see Binary Data). See the
+          individual packet documentation for the interpretation of result
+          and attachment.
+   `'
+          An empty response indicates that this operation is not
+          recognized.
+
+   These are the supported Host I/O operations:
+
+   `vFile:open: pathname, flags, mode'
+          Open a file at pathname and return a file descriptor for it, or
+          return -1 if an error occurs. pathname is a string, flags is an
+          integer indicating a mask of open flags (see section Open
+          Flags), and mode is an integer indicating a mask of mode bits to
+          use if the file is created (see section mode_t Values). See
+          section open, for details of the open flags and mode values.
+   `vFile:close: fd'
+          Close the open file corresponding to fd and return 0, or -1 if
+          an error occurs.
+   `vFile:pread: fd, count, offset'
+          Read data from the open file corresponding to fd. Up to count
+          bytes will be read from the file, starting at offset relative to
+          the start of the file. The target may read fewer bytes; common
+          reasons include packet size limits and an end-of-file condition.
+          The number of bytes read is returned. Zero should only be
+          returned for a successful read at the end of the file, or if
+          count was zero.
+          The data read should be returned as a binary attachment on
+          success. If zero bytes were read, the response should include an
+          empty binary attachment (i.e. a trailing semicolon). The return
+          value is the number of target bytes read; the binary attachment
+          may be longer if some characters were escaped.
+   `vFile:pwrite: fd, offset, data'
+          Write data (a binary buffer) to the open file corresponding to
+          fd. Start the write at offset from the start of the file. Unlike
+          many write system calls, there is no separate count argument;
+          the length of data in the packet is used. `vFile:write' returns
+          the number of bytes written, which may be shorter than the
+          length of data, or -1 if an error occurred.
+   `vFile:unlink: pathname'
+          Delete the file at pathname on the target. Return 0, or -1 if an
+          error occurs. pathname is a string.
+     __________________________________________________________________
+
+   [ < ] [ > ]   [ << ] [ Up ] [ >> ]         [Top] [Contents] [Index] [ ?
+   ]
+
+D.8 Interrupts
+
+   When a program on the remote target is running, GDB may attempt to
+   interrupt it by sending a `Ctrl-C' or a BREAK, control of which is
+   specified via GDB's `remotebreak' setting (see set remotebreak).
+
+   The precise meaning of BREAK is defined by the transport mechanism and
+   may, in fact, be undefined. GDB does not currently define a BREAK
+   mechanism for any of the network interfaces except for TCP, in which
+   case GDB sends the telnet BREAK sequence.
+
+   `Ctrl-C', on the other hand, is defined and implemented for all
+   transport mechanisms. It is represented by sending the single byte 0x03
+   without any of the usual packet overhead described in the Overview
+   section (see section D.1 Overview). When a 0x03 byte is transmitted as
+   part of a packet, it is considered to be packet data and does not
+   represent an interrupt. E.g., an `X' packet (see X packet), used for
+   binary downloads, may include an unescaped 0x03 as part of its packet.
+
+   Stubs are not required to recognize these interrupt mechanisms and the
+   precise meaning associated with receipt of the interrupt is
+   implementation defined. If the target supports debugging of multiple
+   threads and/or processes, it should attempt to interrupt all
+   currently-executing threads and processes. If the stub is successful at
+   interrupting the running program, it should send one of the stop reply
+   packets (see section D.3 Stop Reply Packets) to GDB as a result of
+   successfully stopping the program in all-stop mode, and a stop reply
+   for each stopped thread in non-stop mode. Interrupts received while the
+   program is stopped are discarded.
+     __________________________________________________________________
+
+   [ < ] [ > ]   [ << ] [ Up ] [ >> ]         [Top] [Contents] [Index] [ ?
+   ]
+
+D.9 Notification Packets
+
+   The GDB remote serial protocol includes notifications, packets that
+   require no acknowledgment. Both the GDB and the stub may send
+   notifications (although the only notifications defined at present are
+   sent by the stub). Notifications carry information without incurring
+   the round-trip latency of an acknowledgment, and so are useful for
+   low-impact communications where occasional packet loss is not a
+   problem.
+
+   A notification packet has the form `% data # checksum', where data is
+   the content of the notification, and checksum is a checksum of data,
+   computed and formatted as for ordinary GDB packets. A notification's
+   data never contains `$', `%' or `#' characters. Upon receiving a
+   notification, the recipient sends no `+' or `-' to acknowledge the
+   notification's receipt or to report its corruption.
+
+   Every notification's data begins with a name, which contains no colon
+   characters, followed by a colon character.
+
+   Recipients should silently ignore corrupted notifications and
+   notifications they do not understand. Recipients should restart timeout
+   periods on receipt of a well-formed notification, whether or not they
+   understand it.
+
+   Senders should only send the notifications described here when this
+   protocol description specifies that they are permitted. In the future,
+   we may extend the protocol to permit existing notifications in new
+   contexts; this rule helps older senders avoid confusing newer
+   recipients.
+
+   (Older versions of GDB ignore bytes received until they see the `$'
+   byte that begins an ordinary packet, so new stubs may transmit
+   notifications without fear of confusing older clients. There are no
+   notifications defined for GDB to send at the moment, but we assume that
+   most older stubs would ignore them, as well.)
+
+   The following notification packets from the stub to GDB are defined:
+
+   `Stop: reply'
+          Report an asynchronous stop event in non-stop mode. The reply
+          has the form of a stop reply, as described in D.3 Stop Reply
+          Packets. Refer to D.10 Remote Protocol Support for Non-Stop
+          Mode, for information on how these notifications are
+          acknowledged by GDB.
+     __________________________________________________________________
+
+   [ < ] [ > ]   [ << ] [ Up ] [ >> ]         [Top] [Contents] [Index] [ ?
+   ]
+
+D.10 Remote Protocol Support for Non-Stop Mode
+
+   GDB's remote protocol supports non-stop debugging of multi-threaded
+   programs, as described in 5.4.2 Non-Stop Mode. If the stub supports
+   non-stop mode, it should report that to GDB by including `QNonStop+' in
+   its `qSupported' response (see qSupported).
+
+   GDB typically sends a `QNonStop' packet only when establishing a new
+   connection with the stub. Entering non-stop mode does not alter the
+   state of any currently-running threads, but targets must stop all
+   threads in any already-attached processes when entering all-stop mode.
+   GDB uses the `?' packet as necessary to probe the target state after a
+   mode change.
+
+   In non-stop mode, when an attached process encounters an event that
+   would otherwise be reported with a stop reply, it uses the asynchronous
+   notification mechanism (see section D.9 Notification Packets) to inform
+   GDB. In contrast to all-stop mode, where all threads in all processes
+   are stopped when a stop reply is sent, in non-stop mode only the thread
+   reporting the stop event is stopped. That is, when reporting a `S' or
+   `T' response to indicate completion of a step operation, hitting a
+   breakpoint, or a fault, only the affected thread is stopped; any other
+   still-running threads continue to run. When reporting a `W' or `X'
+   response, all running threads belonging to other attached processes
+   continue to run.
+
+   Only one stop reply notification at a time may be pending; if
+   additional stop events occur before GDB has acknowledged the previous
+   notification, they must be queued by the stub for later synchronous
+   transmission in response to `vStopped' packets from GDB. Because the
+   notification mechanism is unreliable, the stub is permitted to resend a
+   stop reply notification if it believes GDB may not have received it.
+   GDB ignores additional stop reply notifications received before it has
+   finished processing a previous notification and the stub has completed
+   sending any queued stop events.
+
+   Otherwise, GDB must be prepared to receive a stop reply notification at
+   any time. Specifically, they may appear when GDB is not otherwise
+   reading input from the stub, or when GDB is expecting to read a normal
+   synchronous response or a `+'/`-' acknowledgment to a packet it has
+   sent. Notification packets are distinct from any other communication
+   from the stub so there is no ambiguity.
+
+   After receiving a stop reply notification, GDB shall acknowledge it by
+   sending a `vStopped' packet (see vStopped packet) as a regular,
+   synchronous request to the stub. Such acknowledgment is not required to
+   happen immediately, as GDB is permitted to send other, unrelated
+   packets to the stub first, which the stub should process normally.
+
+   Upon receiving a `vStopped' packet, if the stub has other queued stop
+   events to report to GDB, it shall respond by sending a normal stop
+   reply response. GDB shall then send another `vStopped' packet to
+   solicit further responses; again, it is permitted to send other,
+   unrelated packets as well which the stub should process normally.
+
+   If the stub receives a `vStopped' packet and there are no additional
+   stop events to report, the stub shall return an `OK' response. At this
+   point, if further stop events occur, the stub shall send a new stop
+   reply notification, GDB shall accept the notification, and the process
+   shall be repeated.
+
+   In non-stop mode, the target shall respond to the `?' packet as
+   follows. First, any incomplete stop reply notification/`vStopped'
+   sequence in progress is abandoned. The target must begin a new sequence
+   reporting stop events for all stopped threads, whether or not it has
+   previously reported those events to GDB. The first stop reply is sent
+   as a synchronous reply to the `?' packet, and subsequent stop replies
+   are sent as responses to `vStopped' packets using the mechanism
+   described above. The target must not send asynchronous stop reply
+   notifications until the sequence is complete. If all threads are
+   running when the target receives the `?' packet, or if the target is
+   not attached to any process, it shall respond `OK'.
+     __________________________________________________________________
+
+   [ < ] [ > ]   [ << ] [ Up ] [ >> ]         [Top] [Contents] [Index] [ ?
+   ]
+
+D.11 Packet Acknowledgment
+
+   By default, when either the host or the target machine receives a
+   packet, the first response expected is an acknowledgment: either `+'
+   (to indicate the package was received correctly) or `-' (to request
+   retransmission). This mechanism allows the GDB remote protocol to
+   operate over unreliable transport mechanisms, such as a serial line.
+
+   In cases where the transport mechanism is itself reliable (such as a
+   pipe or TCP connection), the `+'/`-' acknowledgments are redundant. It
+   may be desirable to disable them in that case to reduce communication
+   overhead, or for other reasons. This can be accomplished by means of
+   the `QStartNoAckMode' packet; see QStartNoAckMode.
+
+   When in no-acknowledgment mode, neither the stub nor GDB shall send or
+   expect `+'/`-' protocol acknowledgments. The packet and response format
+   still includes the normal checksum, as described in D.1 Overview, but
+   the checksum may be ignored by the receiver.
+
+   If the stub supports `QStartNoAckMode' and prefers to operate in
+   no-acknowledgment mode, it should report that to GDB by including
+   `QStartNoAckMode+' in its response to `qSupported'; see qSupported. If
+   GDB also supports `QStartNoAckMode' and it has not been disabled via
+   the set remote noack-packet off command (see section 18.4 Remote
+   Configuration), GDB may then send a `QStartNoAckMode' packet to the
+   stub. Only then may the stub actually turn off packet acknowledgments.
+   GDB sends a final `+' acknowledgment of the stub's `OK' response, which
+   can be safely ignored by the stub.
+
+   Note that set remote noack-packet command only affects negotiation
+   between GDB and the stub when subsequent connections are made; it does
+   not affect the protocol acknowledgment state for any current
+   connection. Since `+'/`-' acknowledgments are enabled by default when a
+   new connection is established, there is also no protocol request to
+   re-enable the acknowledgments for the current connection, once
+   disabled.
+     __________________________________________________________________
+
+   [ < ] [ > ]   [ << ] [ Up ] [ >> ]         [Top] [Contents] [Index] [ ?
+   ]
+
+D.12 Examples
+
+   Example sequence of a target being re-started. Notice how the restart
+   does not get any direct output:
+
+
+-> R00
+<- +
+target restarts
+-> ?
+<- +
+<- T001:1234123412341234
+-> +
+
+   Example sequence of a target being stepped by a single instruction:
+
+
+-> G1445...
+<- +
+-> s
+<- +
+time passes
+<- T001:1234123412341234
+-> +
+-> g
+<- +
+<- 1455...
+-> +
+     __________________________________________________________________
+
+   [ < ] [ > ]   [ << ] [ Up ] [ >> ]         [Top] [Contents] [Index] [ ?
+   ]
+
+D.13 File-I/O Remote Protocol Extension
+
+     D.13.1 File-I/O Overview
+     D.13.2 Protocol Basics
+     D.13.3 The F Request Packet
+     D.13.4 The F Reply Packet
+     D.13.5 The `Ctrl-C' Message
+     D.13.6 Console I/O
+     D.13.7 List of Supported Calls
+     D.13.8 Protocol-specific Representation of Datatypes
+     D.13.9 Constants
+     D.13.10 File-I/O Examples
+     __________________________________________________________________
+
+   [ < ] [ > ]   [ << ] [ Up ] [ >> ]         [Top] [Contents] [Index] [ ?
+   ]
+
+  D.13.1 File-I/O Overview
+
+   The File I/O remote protocol extension (short: File-I/O) allows the
+   target to use the host's file system and console I/O to perform various
+   system calls. System calls on the target system are translated into a
+   remote protocol packet to the host system, which then performs the
+   needed actions and returns a response packet to the target system. This
+   simulates file system operations even on targets that lack file
+   systems.
+
+   The protocol is defined to be independent of both the host and target
+   systems. It uses its own internal representation of datatypes and
+   values. Both GDB and the target's GDB stub are responsible for
+   translating the system-dependent value representations into the
+   internal protocol representations when data is transmitted.
+
+   The communication is synchronous. A system call is possible only when
+   GDB is waiting for a response from the `C', `c', `S' or `s' packets.
+   While GDB handles the request for a system call, the target is stopped
+   to allow deterministic access to the target's memory. Therefore
+   File-I/O is not interruptible by target signals. On the other hand, it
+   is possible to interrupt File-I/O by a user interrupt (`Ctrl-C') within
+   GDB.
+
+   The target's request to perform a host system call does not finish the
+   latest `C', `c', `S' or `s' action. That means, after finishing the
+   system call, the target returns to continuing the previous activity
+   (continue, step). No additional continue or step request from GDB is
+   required.
+
+
+(gdb) continue
+  <- target requests 'system call X'
+  target is stopped, GDB executes system call
+  -> GDB returns result
+  ... target continues, GDB returns to wait for the target
+  <- target hits breakpoint and sends a Txx packet
+
+   The protocol only supports I/O on the console and to regular files on
+   the host file system. Character or block special devices, pipes, named
+   pipes, sockets or any other communication method on the host system are
+   not supported by this protocol.
+
+   File I/O is not supported in non-stop mode.
+     __________________________________________________________________
+
+   [ < ] [ > ]   [ << ] [ Up ] [ >> ]         [Top] [Contents] [Index] [ ?
+   ]
+
+  D.13.2 Protocol Basics
+
+   The File-I/O protocol uses the F packet as the request as well as reply
+   packet. Since a File-I/O system call can only occur when GDB is waiting
+   for a response from the continuing or stepping target, the File-I/O
+   request is a reply that GDB has to expect as a result of a previous
+   `C', `c', `S' or `s' packet. This F packet contains all information
+   needed to allow GDB to call the appropriate host system call:
+
+     * A unique identifier for the requested system call.
+     * All parameters to the system call. Pointers are given as addresses
+       in the target memory address space. Pointers to strings are given
+       as pointer/length pair. Numerical values are given as they are.
+       Numerical control flags are given in a protocol-specific
+       representation.
+
+   At this point, GDB has to perform the following actions.
+
+     * If the parameters include pointer values to data needed as input to
+       a system call, GDB requests this data from the target with a
+       standard m packet request. This additional communication has to be
+       expected by the target implementation and is handled as any other m
+       packet.
+     * GDB translates all value from protocol representation to host
+       representation as needed. Datatypes are coerced into the host
+       types.
+     * GDB calls the system call.
+     * It then coerces datatypes back to protocol representation.
+     * If the system call is expected to return data in buffer space
+       specified by pointer parameters to the call, the data is
+       transmitted to the target using a M or X packet. This packet has to
+       be expected by the target implementation and is handled as any
+       other M or X packet.
+
+   Eventually GDB replies with another F packet which contains all
+   necessary information for the target to continue. This at least
+   contains
+
+     * Return value.
+     * errno, if has been changed by the system call.
+     * "Ctrl-C" flag.
+
+   After having done the needed type and value coercion, the target
+   continues the latest continue or step action.
+     __________________________________________________________________
+
+   [ < ] [ > ]   [ << ] [ Up ] [ >> ]         [Top] [Contents] [Index] [ ?
+   ]
+
+  D.13.3 The F Request Packet
+
+   The F request packet has the following format:
+
+   `Fcall-id,parameter...'
+          call-id is the identifier to indicate the host system call to be
+          called. This is just the name of the function.
+          parameter... are the parameters to the system call. Parameters
+          are hexadecimal integer values, either the actual values in case
+          of scalar datatypes, pointers to target buffer space in case of
+          compound datatypes and unspecified memory areas, or
+          pointer/length pairs in case of string parameters. These are
+          appended to the call-id as a comma-delimited list. All values
+          are transmitted in ASCII string representation, pointer/length
+          pairs separated by a slash.
+     __________________________________________________________________
+
+   [ < ] [ > ]   [ << ] [ Up ] [ >> ]         [Top] [Contents] [Index] [ ?
+   ]
+
+  D.13.4 The F Reply Packet
+
+   The F reply packet has the following format:
+
+   `Fretcode,errno,Ctrl-C flag;call-specific attachment'
+          retcode is the return code of the system call as hexadecimal
+          value.
+          errno is the errno set by the call, in protocol-specific
+          representation. This parameter can be omitted if the call was
+          successful.
+          Ctrl-C flag is only sent if the user requested a break. In this
+          case, errno must be sent as well, even if the call was
+          successful. The Ctrl-C flag itself consists of the character
+          `C':
+
+
+F0,0,C
+
+          or, if the call was interrupted before the host call has been
+          performed:
+
+
+F-1,4,C
+
+          assuming 4 is the protocol-specific representation of EINTR.
+     __________________________________________________________________
+
+   [ < ] [ > ]   [ << ] [ Up ] [ >> ]         [Top] [Contents] [Index] [ ?
+   ]
+
+  D.13.5 The `Ctrl-C' Message
+
+   If the `Ctrl-C' flag is set in the GDB reply packet (see section D.13.4
+   The F Reply Packet), the target should behave as if it had gotten a
+   break message. The meaning for the target is "system call interrupted
+   by SIGINT". Consequentially, the target should actually stop (as with a
+   break message) and return to GDB with a T02 packet.
+
+   It's important for the target to know in which state the system call
+   was interrupted. There are two possible cases:
+
+     * The system call hasn't been performed on the host yet.
+     * The system call on the host has been finished.
+
+   These two states can be distinguished by the target by the value of the
+   returned errno. If it's the protocol representation of EINTR, the
+   system call hasn't been performed. This is equivalent to the EINTR
+   handling on POSIX systems. In any other case, the target may presume
+   that the system call has been finished -- successfully or not -- and
+   should behave as if the break message arrived right after the system
+   call.
+
+   GDB must behave reliably. If the system call has not been called yet,
+   GDB may send the F reply immediately, setting EINTR as errno in the
+   packet. If the system call on the host has been finished before the
+   user requests a break, the full action must be finished by GDB. This
+   requires sending M or X packets as necessary. The F packet may only be
+   sent when either nothing has happened or the full action has been
+   completed.
+     __________________________________________________________________
+
+   [ < ] [ > ]   [ << ] [ Up ] [ >> ]         [Top] [Contents] [Index] [ ?
+   ]
+
+  D.13.6 Console I/O
+
+   By default and if not explicitly closed by the target system, the file
+   descriptors 0, 1 and 2 are connected to the GDB console. Output on the
+   GDB console is handled as any other file output operation (write(1,
+   ...) or write(2, ...)). Console input is handled by GDB so that after
+   the target read request from file descriptor 0 all following typing is
+   buffered until either one of the following conditions is met:
+
+     * The user types Ctrl-c. The behaviour is as explained above, and the
+       read system call is treated as finished.
+     * The user presses RET. This is treated as end of input with a
+       trailing newline.
+     * The user types Ctrl-d. This is treated as end of input. No trailing
+       character (neither newline nor `Ctrl-D') is appended to the input.
+
+   If the user has typed more characters than fit in the buffer given to
+   the read call, the trailing characters are buffered in GDB until either
+   another read(0, ...) is requested by the target, or debugging is
+   stopped at the user's request.
+     __________________________________________________________________
+
+   [ < ] [ > ]   [ << ] [ Up ] [ >> ]         [Top] [Contents] [Index] [ ?
+   ]
+
+  D.13.7 List of Supported Calls
+
+     open
+     close
+     read
+     write
+     lseek
+     rename
+     unlink
+     stat/fstat
+     gettimeofday
+     isatty
+     system
+     __________________________________________________________________
+
+   [ < ] [ > ]   [ << ] [ Up ] [ >> ]         [Top] [Contents] [Index] [ ?
+   ]
+
+    open
+
+   Synopsis:
+
+
+int open(const char *pathname, int flags);
+int open(const char *pathname, int flags, mode_t mode);
+
+   Request:
+          `Fopen,pathptr/len,flags,mode'
+          flags is the bitwise OR of the following values:
+        O_CREAT
+               If the file does not exist it will be created. The host
+               rules apply as far as file ownership and time stamps are
+               concerned.
+        O_EXCL
+               When used with O_CREAT, if the file already exists it is an
+               error and open() fails.
+        O_TRUNC
+               If the file already exists and the open mode allows writing
+               (O_RDWR or O_WRONLY is given) it will be truncated to zero
+               length.
+        O_APPEND
+               The file is opened in append mode.
+        O_RDONLY
+               The file is opened for reading only.
+        O_WRONLY
+               The file is opened for writing only.
+        O_RDWR
+               The file is opened for reading and writing.
+          Other bits are silently ignored.
+          mode is the bitwise OR of the following values:
+        S_IRUSR
+               User has read permission.
+        S_IWUSR
+               User has write permission.
+        S_IRGRP
+               Group has read permission.
+        S_IWGRP
+               Group has write permission.
+        S_IROTH
+               Others have read permission.
+        S_IWOTH
+               Others have write permission.
+          Other bits are silently ignored.
+   Return value:
+          open returns the new file descriptor or -1 if an error occurred.
+   Errors:
+        EEXIST
+               pathname already exists and O_CREAT and O_EXCL were used.
+        EISDIR
+               pathname refers to a directory.
+        EACCES
+               The requested access is not allowed.
+        ENAMETOOLONG
+               pathname was too long.
+        ENOENT
+               A directory component in pathname does not exist.
+        ENODEV
+               pathname refers to a device, pipe, named pipe or socket.
+        EROFS
+               pathname refers to a file on a read-only filesystem and
+               write access was requested.
+        EFAULT
+               pathname is an invalid pointer value.
+        ENOSPC
+               No space on device to create the file.
+        EMFILE
+               The process already has the maximum number of files open.
+        ENFILE
+               The limit on the total number of files open on the system
+               has been reached.
+        EINTR
+               The call was interrupted by the user.
+     __________________________________________________________________
+
+   [ < ] [ > ]   [ << ] [ Up ] [ >> ]         [Top] [Contents] [Index] [ ?
+   ]
+
+    close
+
+   Synopsis:
+
+
+int close(int fd);
+
+   Request:
+          `Fclose,fd'
+   Return value:
+          close returns zero on success, or -1 if an error occurred.
+   Errors:
+        EBADF
+               fd isn't a valid open file descriptor.
+        EINTR
+               The call was interrupted by the user.
+     __________________________________________________________________
+
+   [ < ] [ > ]   [ << ] [ Up ] [ >> ]         [Top] [Contents] [Index] [ ?
+   ]
+
+    read
+
+   Synopsis:
+
+
+int read(int fd, void *buf, unsigned int count);
+
+   Request:
+          `Fread,fd,bufptr,count'
+   Return value:
+          On success, the number of bytes read is returned. Zero indicates
+          end of file. If count is zero, read returns zero as well. On
+          error, -1 is returned.
+   Errors:
+        EBADF
+               fd is not a valid file descriptor or is not open for
+               reading.
+        EFAULT
+               bufptr is an invalid pointer value.
+        EINTR
+               The call was interrupted by the user.
+     __________________________________________________________________
+
+   [ < ] [ > ]   [ << ] [ Up ] [ >> ]         [Top] [Contents] [Index] [ ?
+   ]
+
+    write
+
+   Synopsis:
+
+
+int write(int fd, const void *buf, unsigned int count);
+
+   Request:
+          `Fwrite,fd,bufptr,count'
+   Return value:
+          On success, the number of bytes written are returned. Zero
+          indicates nothing was written. On error, -1 is returned.
+   Errors:
+        EBADF
+               fd is not a valid file descriptor or is not open for
+               writing.
+        EFAULT
+               bufptr is an invalid pointer value.
+        EFBIG
+               An attempt was made to write a file that exceeds the
+               host-specific maximum file size allowed.
+        ENOSPC
+               No space on device to write the data.
+        EINTR
+               The call was interrupted by the user.
+     __________________________________________________________________
+
+   [ < ] [ > ]   [ << ] [ Up ] [ >> ]         [Top] [Contents] [Index] [ ?
+   ]
+
+    lseek
+
+   Synopsis:
+
+
+long lseek (int fd, long offset, int flag);
+
+   Request:
+          `Flseek,fd,offset,flag'
+          flag is one of:
+        SEEK_SET
+               The offset is set to offset bytes.
+        SEEK_CUR
+               The offset is set to its current location plus offset
+               bytes.
+        SEEK_END
+               The offset is set to the size of the file plus offset
+               bytes.
+   Return value:
+          On success, the resulting unsigned offset in bytes from the
+          beginning of the file is returned. Otherwise, a value of -1 is
+          returned.
+   Errors:
+        EBADF
+               fd is not a valid open file descriptor.
+        ESPIPE
+               fd is associated with the GDB console.
+        EINVAL
+               flag is not a proper value.
+        EINTR
+               The call was interrupted by the user.
+     __________________________________________________________________
+
+   [ < ] [ > ]   [ << ] [ Up ] [ >> ]         [Top] [Contents] [Index] [ ?
+   ]
+
+    rename
+
+   Synopsis:
+
+
+int rename(const char *oldpath, const char *newpath);
+
+   Request:
+          `Frename,oldpathptr/len,newpathptr/len'
+   Return value:
+          On success, zero is returned. On error, -1 is returned.
+   Errors:
+        EISDIR
+               newpath is an existing directory, but oldpath is not a
+               directory.
+        EEXIST
+               newpath is a non-empty directory.
+        EBUSY
+               oldpath or newpath is a directory that is in use by some
+               process.
+        EINVAL
+               An attempt was made to make a directory a subdirectory of
+               itself.
+        ENOTDIR
+               A component used as a directory in oldpath or new path is
+               not a directory. Or oldpath is a directory and newpath
+               exists but is not a directory.
+        EFAULT
+               oldpathptr or newpathptr are invalid pointer values.
+        EACCES
+               No access to the file or the path of the file.
+        ENAMETOOLONG
+               oldpath or newpath was too long.
+        ENOENT
+               A directory component in oldpath or newpath does not exist.
+        EROFS
+               The file is on a read-only filesystem.
+        ENOSPC
+               The device containing the file has no room for the new
+               directory entry.
+        EINTR
+               The call was interrupted by the user.
+     __________________________________________________________________
+
+   [ < ] [ > ]   [ << ] [ Up ] [ >> ]         [Top] [Contents] [Index] [ ?
+   ]
+
+    unlink
+
+   Synopsis:
+
+
+int unlink(const char *pathname);
+
+   Request:
+          `Funlink,pathnameptr/len'
+   Return value:
+          On success, zero is returned. On error, -1 is returned.
+   Errors:
+        EACCES
+               No access to the file or the path of the file.
+        EPERM
+               The system does not allow unlinking of directories.
+        EBUSY
+               The file pathname cannot be unlinked because it's being
+               used by another process.
+        EFAULT
+               pathnameptr is an invalid pointer value.
+        ENAMETOOLONG
+               pathname was too long.
+        ENOENT
+               A directory component in pathname does not exist.
+        ENOTDIR
+               A component of the path is not a directory.
+        EROFS
+               The file is on a read-only filesystem.
+        EINTR
+               The call was interrupted by the user.
+     __________________________________________________________________
+
+   [ < ] [ > ]   [ << ] [ Up ] [ >> ]         [Top] [Contents] [Index] [ ?
+   ]
+
+    stat/fstat
+
+   Synopsis:
+
+
+int stat(const char *pathname, struct stat *buf);
+int fstat(int fd, struct stat *buf);
+
+   Request:
+          `Fstat,pathnameptr/len,bufptr'
+          `Ffstat,fd,bufptr'
+   Return value:
+          On success, zero is returned. On error, -1 is returned.
+   Errors:
+        EBADF
+               fd is not a valid open file.
+        ENOENT
+               A directory component in pathname does not exist or the
+               path is an empty string.
+        ENOTDIR
+               A component of the path is not a directory.
+        EFAULT
+               pathnameptr is an invalid pointer value.
+        EACCES
+               No access to the file or the path of the file.
+        ENAMETOOLONG
+               pathname was too long.
+        EINTR
+               The call was interrupted by the user.
+     __________________________________________________________________
+
+   [ < ] [ > ]   [ << ] [ Up ] [ >> ]         [Top] [Contents] [Index] [ ?
+   ]
+
+    gettimeofday
+
+   Synopsis:
+
+
+int gettimeofday(struct timeval *tv, void *tz);
+
+   Request:
+          `Fgettimeofday,tvptr,tzptr'
+   Return value:
+          On success, 0 is returned, -1 otherwise.
+   Errors:
+        EINVAL
+               tz is a non-NULL pointer.
+        EFAULT
+               tvptr and/or tzptr is an invalid pointer value.
+     __________________________________________________________________
+
+   [ < ] [ > ]   [ << ] [ Up ] [ >> ]         [Top] [Contents] [Index] [ ?
+   ]
+
+    isatty
+
+   Synopsis:
+
+
+int isatty(int fd);
+
+   Request:
+          `Fisatty,fd'
+   Return value:
+          Returns 1 if fd refers to the GDB console, 0 otherwise.
+   Errors:
+        EINTR
+               The call was interrupted by the user.
+
+   Note that the isatty call is treated as a special case: it returns 1 to
+   the target if the file descriptor is attached to the GDB console, 0
+   otherwise. Implementing through system calls would require implementing
+   ioctl and would be more complex than needed.
+     __________________________________________________________________
+
+   [ < ] [ > ]   [ << ] [ Up ] [ >> ]         [Top] [Contents] [Index] [ ?
+   ]
+
+    system
+
+   Synopsis:
+
+
+int system(const char *command);
+
+   Request:
+          `Fsystem,commandptr/len'
+   Return value:
+          If len is zero, the return value indicates whether a shell is
+          available. A zero return value indicates a shell is not
+          available. For non-zero len, the value returned is -1 on error
+          and the return status of the command otherwise. Only the exit
+          status of the command is returned, which is extracted from the
+          host's system return value by calling WEXITSTATUS(retval). In
+          case `/bin/sh' could not be executed, 127 is returned.
+   Errors:
+        EINTR
+               The call was interrupted by the user.
+
+   GDB takes over the full task of calling the necessary host calls to
+   perform the system call. The return value of system on the host is
+   simplified before it's returned to the target. Any termination signal
+   information from the child process is discarded, and the return value
+   consists entirely of the exit status of the called command.
+
+   Due to security concerns, the system call is by default refused by GDB.
+   The user has to allow this call explicitly with the set remote
+   system-call-allowed 1 command.
+
+   set remote system-call-allowed
+          Control whether to allow the system calls in the File I/O
+          protocol for the remote target. The default is zero (disabled).
+   show remote system-call-allowed
+          Show whether the system calls are allowed in the File I/O
+          protocol.
+     __________________________________________________________________
+
+   [ < ] [ > ]   [ << ] [ Up ] [ >> ]         [Top] [Contents] [Index] [ ?
+   ]
+
+  D.13.8 Protocol-specific Representation of Datatypes
+
+     Integral Datatypes
+     Pointer Values
+     Memory Transfer
+     struct stat
+     struct timeval
+     __________________________________________________________________
+
+   [ < ] [ > ]   [ << ] [ Up ] [ >> ]         [Top] [Contents] [Index] [ ?
+   ]
+
+    Integral Datatypes
+
+   The integral datatypes used in the system calls are int, unsigned int,
+   long, unsigned long, mode_t, and time_t.
+
+   int, unsigned int, mode_t and time_t are implemented as 32 bit values
+   in this protocol.
+
+   long and unsigned long are implemented as 64 bit types.
+
+   See section Limits, for corresponding MIN and MAX values (similar to
+   those in `limits.h') to allow range checking on host and target.
+
+   time_t datatypes are defined as seconds since the Epoch.
+
+   All integral datatypes transferred as part of a memory read or write of
+   a structured datatype e.g. a struct stat have to be given in big endian
+   byte order.
+     __________________________________________________________________
+
+   [ < ] [ > ]   [ << ] [ Up ] [ >> ]         [Top] [Contents] [Index] [ ?
+   ]
+
+    Pointer Values
+
+   Pointers to target data are transmitted as they are. An exception is
+   made for pointers to buffers for which the length isn't transmitted as
+   part of the function call, namely strings. Strings are transmitted as a
+   pointer/length pair, both as hex values, e.g.
+
+
+1aaf/12
+
+   which is a pointer to data of length 18 bytes at position 0x1aaf. The
+   length is defined as the full string length in bytes, including the
+   trailing null byte. For example, the string "hello world" at address
+   0x123456 is transmitted as
+
+
+123456/d
+     __________________________________________________________________
+
+   [ < ] [ > ]   [ << ] [ Up ] [ >> ]         [Top] [Contents] [Index] [ ?
+   ]
+
+    Memory Transfer
+
+   Structured data which is transferred using a memory read or write (for
+   example, a struct stat) is expected to be in a protocol-specific format
+   with all scalar multibyte datatypes being big endian. Translation to
+   this representation needs to be done both by the target before the F
+   packet is sent, and by GDB before it transfers memory to the target.
+   Transferred pointers to structured data should point to the
+   already-coerced data at any time.
+     __________________________________________________________________
+
+   [ < ] [ > ]   [ << ] [ Up ] [ >> ]         [Top] [Contents] [Index] [ ?
+   ]
+
+    struct stat
+
+   The buffer of type struct stat used by the target and GDB is defined as
+   follows:
+
+
+struct stat {
+    unsigned int  st_dev;      /* device */
+    unsigned int  st_ino;      /* inode */
+    mode_t        st_mode;     /* protection */
+    unsigned int  st_nlink;    /* number of hard links */
+    unsigned int  st_uid;      /* user ID of owner */
+    unsigned int  st_gid;      /* group ID of owner */
+    unsigned int  st_rdev;     /* device type (if inode device) */
+    unsigned long st_size;     /* total size, in bytes */
+    unsigned long st_blksize;  /* blocksize for filesystem I/O */
+    unsigned long st_blocks;   /* number of blocks allocated */
+    time_t        st_atime;    /* time of last access */
+    time_t        st_mtime;    /* time of last modification */
+    time_t        st_ctime;    /* time of last change */
+};
+
+   The integral datatypes conform to the definitions given in the
+   appropriate section (see Integral Datatypes, for details) so this
+   structure is of size 64 bytes.
+
+   The values of several fields have a restricted meaning and/or range of
+   values.
+
+   st_dev
+          A value of 0 represents a file, 1 the console.
+   st_ino
+          No valid meaning for the target. Transmitted unchanged.
+   st_mode
+          Valid mode bits are described in D.13.9 Constants. Any other
+          bits have currently no meaning for the target.
+   st_uid
+   st_gid
+   st_rdev
+          No valid meaning for the target. Transmitted unchanged.
+   st_atime
+   st_mtime
+   st_ctime
+          These values have a host and file system dependent accuracy.
+          Especially on Windows hosts, the file system may not support
+          exact timing values.
+
+   The target gets a struct stat of the above representation and is
+   responsible for coercing it to the target representation before
+   continuing.
+
+   Note that due to size differences between the host, target, and
+   protocol representations of struct stat members, these members could
+   eventually get truncated on the target.
+     __________________________________________________________________
+
+   [ < ] [ > ]   [ << ] [ Up ] [ >> ]         [Top] [Contents] [Index] [ ?
+   ]
+
+    struct timeval
+
+   The buffer of type struct timeval used by the File-I/O protocol is
+   defined as follows:
+
+
+struct timeval {
+    time_t tv_sec;  /* second */
+    long   tv_usec; /* microsecond */
+};
+
+   The integral datatypes conform to the definitions given in the
+   appropriate section (see Integral Datatypes, for details) so this
+   structure is of size 8 bytes.
+     __________________________________________________________________
+
+   [ < ] [ > ]   [ << ] [ Up ] [ >> ]         [Top] [Contents] [Index] [ ?
+   ]
+
+  D.13.9 Constants
+
+   The following values are used for the constants inside of the protocol.
+   GDB and target are responsible for translating these values before and
+   after the call as needed.
+
+     Open Flags
+     mode_t Values
+     Errno Values
+     Lseek Flags
+     Limits
+     __________________________________________________________________
+
+   [ < ] [ > ]   [ << ] [ Up ] [ >> ]         [Top] [Contents] [Index] [ ?
+   ]
+
+    Open Flags
+
+   All values are given in hexadecimal representation.
+
+
+  O_RDONLY        0x0
+  O_WRONLY        0x1
+  O_RDWR          0x2
+  O_APPEND        0x8
+  O_CREAT       0x200
+  O_TRUNC       0x400
+  O_EXCL        0x800
+     __________________________________________________________________
+
+   [ < ] [ > ]   [ << ] [ Up ] [ >> ]         [Top] [Contents] [Index] [ ?
+   ]
+
+    mode_t Values
+
+   All values are given in octal representation.
+
+
+  S_IFREG       0100000
+  S_IFDIR        040000
+  S_IRUSR          0400
+  S_IWUSR          0200
+  S_IXUSR          0100
+  S_IRGRP           040
+  S_IWGRP           020
+  S_IXGRP           010
+  S_IROTH            04
+  S_IWOTH            02
+  S_IXOTH            01
+     __________________________________________________________________
+
+   [ < ] [ > ]   [ << ] [ Up ] [ >> ]         [Top] [Contents] [Index] [ ?
+   ]
+
+    Errno Values
+
+   All values are given in decimal representation.
+
+
+  EPERM           1
+  ENOENT          2
+  EINTR           4
+  EBADF           9
+  EACCES         13
+  EFAULT         14
+  EBUSY          16
+  EEXIST         17
+  ENODEV         19
+  ENOTDIR        20
+  EISDIR         21
+  EINVAL         22
+  ENFILE         23
+  EMFILE         24
+  EFBIG          27
+  ENOSPC         28
+  ESPIPE         29
+  EROFS          30
+  ENAMETOOLONG   91
+  EUNKNOWN       9999
+
+   EUNKNOWN is used as a fallback error value if a host system returns any
+   error value not in the list of supported error numbers.
+     __________________________________________________________________
+
+   [ < ] [ > ]   [ << ] [ Up ] [ >> ]         [Top] [Contents] [Index] [ ?
+   ]
+
+    Lseek Flags
+
+
+  SEEK_SET      0
+  SEEK_CUR      1
+  SEEK_END      2
+     __________________________________________________________________
+
+   [ < ] [ > ]   [ << ] [ Up ] [ >> ]         [Top] [Contents] [Index] [ ?
+   ]
+
+    Limits
+
+   All values are given in decimal representation.
+
+
+  INT_MIN       -2147483648
+  INT_MAX        2147483647
+  UINT_MAX       4294967295
+  LONG_MIN      -9223372036854775808
+  LONG_MAX       9223372036854775807
+  ULONG_MAX      18446744073709551615
+     __________________________________________________________________
+
+   [ < ] [ > ]   [ << ] [ Up ] [ >> ]         [Top] [Contents] [Index] [ ?
+   ]
+
+  D.13.10 File-I/O Examples
+
+   Example sequence of a write call, file descriptor 3, buffer is at
+   target address 0x1234, 6 bytes should be written:
+
+
+<- Fwrite,3,1234,6
+request memory read from target
+-> m1234,6
+<- XXXXXX
+return "6 bytes written"
+-> F6
+
+   Example sequence of a read call, file descriptor 3, buffer is at target
+   address 0x1234, 6 bytes should be read:
+
+
+<- Fread,3,1234,6
+request memory write to target
+-> X1234,6:XXXXXX
+return "6 bytes read"
+-> F6
+
+   Example sequence of a read call, call fails on the host due to invalid
+   file descriptor (EBADF):
+
+
+<- Fread,3,1234,6
+-> F-1,9
+
+   Example sequence of a read call, user presses Ctrl-c before syscall on
+   host is called:
+
+
+<- Fread,3,1234,6
+-> F-1,4,C
+<- T02
+
+   Example sequence of a read call, user presses Ctrl-c after syscall on
+   host is called:
+
+
+<- Fread,3,1234,6
+-> X1234,6:XXXXXX
+<- T02
+     __________________________________________________________________
+
+   [ < ] [ > ]   [ << ] [ Up ] [ >> ]         [Top] [Contents] [Index] [ ?
+   ]
+
+D.14 Library List Format
+
+   On some platforms, a dynamic loader (e.g. `ld.so') runs in the same
+   process as your application to manage libraries. In this case, GDB can
+   use the loader's symbol table and normal memory operations to maintain
+   a list of shared libraries. On other platforms, the operating system
+   manages loaded libraries. GDB can not retrieve the list of currently
+   loaded libraries through memory operations, so it uses the
+   `qXfer:libraries:read' packet (see qXfer library list read) instead.
+   The remote stub queries the target's operating system and reports which
+   libraries are loaded.
+
+   The `qXfer:libraries:read' packet returns an XML document which lists
+   loaded libraries and their offsets. Each library has an associated name
+   and one or more segment or section base addresses, which report where
+   the library was loaded in memory.
+
+   For the common case of libraries that are fully linked binaries, the
+   library should have a list of segments. If the target supports dynamic
+   linking of a relocatable object file, its library XML element should
+   instead include a list of allocated sections. The segment or section
+   bases are start addresses, not relocation offsets; they do not depend
+   on the library's link-time base addresses.
+
+   GDB must be linked with the Expat library to support XML library lists.
+   See Expat.
+
+   A simple memory map, with one loaded library relocated by a single
+   offset, looks like this:
+
+
+<library-list>
+  <library name="/lib/libc.so.6">
+    <segment address="0x10000000"/>
+  </library>
+</library-list>
+
+   Another simple memory map, with one loaded library with three allocated
+   sections (.text, .data, .bss), looks like this:
+
+
+<library-list>
+  <library name="sharedlib.o">
+    <section address="0x10000000"/>
+    <section address="0x20000000"/>
+    <section address="0x30000000"/>
+  </library>
+</library-list>
+
+   The format of a library list is described by this DTD:
+
+
+<!-- library-list: Root element with versioning -->
+<!ELEMENT library-list  (library)*>
+<!ATTLIST library-list  version CDATA   #FIXED  "1.0">
+<!ELEMENT library       (segment*, section*)>
+<!ATTLIST library       name    CDATA   #REQUIRED>
+<!ELEMENT segment       EMPTY>
+<!ATTLIST segment       address CDATA   #REQUIRED>
+<!ELEMENT section       EMPTY>
+<!ATTLIST section       address CDATA   #REQUIRED>
+
+   In addition, segments and section descriptors cannot be mixed within a
+   single library element, and you must supply at least one segment or
+   section for each library.
+     __________________________________________________________________
+
+   [ < ] [ > ]   [ << ] [ Up ] [ >> ]         [Top] [Contents] [Index] [ ?
+   ]
+
+D.15 Memory Map Format
+
+   To be able to write into flash memory, GDB needs to obtain a memory map
+   from the target. This section describes the format of the memory map.
+
+   The memory map is obtained using the `qXfer:memory-map:read' (see qXfer
+   memory map read) packet and is an XML document that lists memory
+   regions.
+
+   GDB must be linked with the Expat library to support XML memory maps.
+   See Expat.
+
+   The top-level structure of the document is shown below:
+
+
+<?xml version="1.0"?>
+<!DOCTYPE memory-map
+          PUBLIC "+//IDN gnu.org//DTD GDB Memory Map V1.0//EN"
+                 "http://sourceware.org/gdb/gdb-memory-map.dtd">
+<memory-map>
+    region...
+</memory-map>
+
+   Each region can be either:
+
+     * A region of RAM starting at addr and extending for length bytes
+       from there:
+
+
+<memory type="ram" start="addr" length="length"/>
+
+     * A region of read-only memory:
+
+
+<memory type="rom" start="addr" length="length"/>
+
+     * A region of flash memory, with erasure blocks blocksize bytes in
+       length:
+
+
+<memory type="flash" start="addr" length="length">
+  <property name="blocksize">blocksize</property>
+</memory>
+
+   Regions must not overlap. GDB assumes that areas of memory not covered
+   by the memory map are RAM, and uses the ordinary `M' and `X' packets to
+   write to addresses in such ranges.
+
+   The formal DTD for memory map format is given below:
+
+
+<!-- ................................................... -->
+<!-- Memory Map XML DTD ................................ -->
+<!-- File: memory-map.dtd .............................. -->
+<!-- .................................... .............. -->
+<!-- memory-map.dtd -->
+<!-- memory-map: Root element with versioning -->
+<!ELEMENT memory-map (memory | property)>
+<!ATTLIST memory-map    version CDATA   #FIXED  "1.0.0">
+<!ELEMENT memory (property)>
+<!-- memory: Specifies a memory region,
+             and its type, or device. -->
+<!ATTLIST memory        type    CDATA   #REQUIRED
+                        start   CDATA   #REQUIRED
+                        length  CDATA   #REQUIRED
+                        device  CDATA   #IMPLIED>
+<!-- property: Generic attribute tag -->
+<!ELEMENT property (#PCDATA | property)*>
+<!ATTLIST property      name    CDATA   #REQUIRED>
+     __________________________________________________________________
+
+   [ << ] [ >> ]           [Top] [Contents] [Index] [ ? ]
+
+
+    Please send FSF & GNU inquiries & questions to gnu@gnu.org. There are
+    also other ways to contact the FSF.
+    These pages are maintained by the GDB developers.
+    Copyright Free Software Foundation, Inc., 59 Temple Place - Suite
+    330, Boston, MA 02111, USA.
+    Verbatim copying and distribution of this entire article is permitted
+    in any medium, provided this notice is preserved.
+
+   This document was generated by GDB Administrator on April, 3 2009 using
+   texi2html

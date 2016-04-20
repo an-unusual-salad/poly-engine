@@ -1,0 +1,17 @@
+#!../../evarista/evarista32
+
+#profile enable warn
+
+print ************ Now declarations of bitfields types *****************
+
+type struct1 = field1:long field2:bit[31] field3:byte
+type 
+
+print ************ Now declarations of variables *****************
+
+struct1 test1 = (field1:0x12345678, field2:0x00FF00FF, field3:A)
+
+print $test1
+
+quit
+

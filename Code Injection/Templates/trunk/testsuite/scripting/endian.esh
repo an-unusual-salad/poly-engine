@@ -1,0 +1,12 @@
+#!../../elfsh/elfsh32
+
+load /bin/ls
+
+got 00
+set 1.got[0] .plt
+got 00
+
+save ls.test
+load ls.test
+got 00
+

@@ -1,0 +1,4 @@
+This folder contains some tests program.
+gcc -c mod.c; gcc random.o mod.o -o test
+$ test ../spectrum/stat2 lets see you how we take the beginning into 
+account. You can look at the code if you want to have an idea.

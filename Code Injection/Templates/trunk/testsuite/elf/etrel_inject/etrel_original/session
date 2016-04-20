@@ -1,0 +1,123 @@
+ [*] Started logging session in session 
+
+~reladd 1 2  [1;31m[W][0m             <[31melfsh_get_segment_by_type[0m@[32mpht.c[0m:[36m290[0m>      [1;31mUnable to find PHDR by type[0m 
+ [1;31m[W][0m               <[31melfsh_get_symbol_by_name[0m@[32msymbol.c[0m:[36m256[0m>    [1;31mSymbol not found[0m 
+ [1;31m[W][0m                <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m                <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m            <[31melfsh_get_symbol_by_name[0m@[32msymbol.c[0m:[36m256[0m>    [1;31mSymbol not found[0m 
+ [1;31m[W][0m             <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m             <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m            <[31melfsh_get_symbol_by_name[0m@[32msymbol.c[0m:[36m256[0m>    [1;31mSymbol not found[0m 
+ [1;31m[W][0m             <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m             <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m            <[31melfsh_get_symbol_by_name[0m@[32msymbol.c[0m:[36m256[0m>    [1;31mSymbol not found[0m 
+ [1;31m[W][0m             <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m             <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m            <[31melfsh_get_symbol_by_name[0m@[32msymbol.c[0m:[36m256[0m>    [1;31mSymbol not found[0m 
+ [1;31m[W][0m             <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m             <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m             <[31melfsh_get_symbol_by_name[0m@[32msymbol.c[0m:[36m256[0m>    [1;31mSymbol not found[0m 
+ [1;31m[W][0m              <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m              <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m           <[31melfsh_get_segment_by_type[0m@[32mpht.c[0m:[36m290[0m>      [1;31mUnable to find PHDR by type[0m 
+ [1;31m[W][0m             <[31melfsh_get_symbol_by_name[0m@[32msymbol.c[0m:[36m256[0m>    [1;31mSymbol not found[0m 
+ [1;31m[W][0m              <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m              <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m             <[31melfsh_get_symbol_by_name[0m@[32msymbol.c[0m:[36m256[0m>    [1;31mSymbol not found[0m 
+ [1;31m[W][0m              <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m              <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m           <[31melfsh_get_section_by_name_withlist[0m@[32msection.c[0m:[36m244[0m> [1;31mSection not found[0m 
+ [1;31m[W][0m          <[31melfsh_get_section_by_name[0m@[32msection.c[0m:[36m276[0m>  [1;31mSection not found[0m 
+ [1;31m[W][0m             <[31melfsh_get_symbol_by_name[0m@[32msymbol.c[0m:[36m256[0m>    [1;31mSymbol not found[0m 
+ [1;31m[W][0m              <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m              <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m           <[31melfsh_get_segment_by_type[0m@[32mpht.c[0m:[36m290[0m>      [1;31mUnable to find PHDR by type[0m 
+ [1;31m[W][0m             <[31melfsh_get_symbol_by_name[0m@[32msymbol.c[0m:[36m256[0m>    [1;31mSymbol not found[0m 
+ [1;31m[W][0m              <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m              <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m             <[31melfsh_get_symbol_by_name[0m@[32msymbol.c[0m:[36m256[0m>    [1;31mSymbol not found[0m 
+ [1;31m[W][0m              <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m              <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m           <[31melfsh_get_symbol_by_name[0m@[32msymbol.c[0m:[36m256[0m>    [1;31mSymbol not found[0m 
+ [1;31m[W][0m            <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m            <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m          <[31melfsh_get_symbol_by_name[0m@[32msymbol.c[0m:[36m256[0m>    [1;31mSymbol not found[0m 
+ [1;31m[W][0m           <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m           <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m          <[31melfsh_get_symbol_by_name[0m@[32msymbol.c[0m:[36m256[0m>    [1;31mSymbol not found[0m 
+ [1;31m[W][0m           <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m           <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m          <[31melfsh_get_symbol_by_name[0m@[32msymbol.c[0m:[36m256[0m>    [1;31mSymbol not found[0m 
+ [1;31m[W][0m           <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m           <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m          <[31melfsh_get_symbol_by_name[0m@[32msymbol.c[0m:[36m256[0m>    [1;31mSymbol not found[0m 
+ [1;31m[W][0m           <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m           <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m          <[31melfsh_get_symbol_by_name[0m@[32msymbol.c[0m:[36m256[0m>    [1;31mSymbol not found[0m 
+ [1;31m[W][0m           <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m           <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m          <[31melfsh_get_symbol_by_name[0m@[32msymbol.c[0m:[36m256[0m>    [1;31mSymbol not found[0m 
+ [1;31m[W][0m           <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m           <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m          <[31melfsh_get_symbol_by_name[0m@[32msymbol.c[0m:[36m256[0m>    [1;31mSymbol not found[0m 
+ [1;31m[W][0m           <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m           <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m          <[31melfsh_get_symbol_by_name[0m@[32msymbol.c[0m:[36m256[0m>    [1;31mSymbol not found[0m 
+ [1;31m[W][0m           <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m           <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m   <[31melfsh_get_sym_by_value[0m@[32msym_common.c[0m:[36m263[0m>  [1;31mNo exact symbol matching[0m 
+ [1;31m[W][0m          <[31melfsh_get_symbol_by_name[0m@[32msymbol.c[0m:[36m256[0m>    [1;31mSymbol not found[0m 
+ [1;31m[W][0m           <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m           <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m           <[31melfsh_get_section_by_name_withlist[0m@[32msection.c[0m:[36m244[0m> [1;31mSection not found[0m 
+ [1;31m[W][0m          <[31melfsh_get_section_by_name[0m@[32msection.c[0m:[36m276[0m>  [1;31mSection not found[0m 
+ [1;31m[W][0m             <[31melfsh_get_segment_by_type[0m@[32mpht.c[0m:[36m290[0m>      [1;31mUnable to find PHDR by type[0m 
+ [1;31m[W][0m               <[31melfsh_get_symbol_by_name[0m@[32msymbol.c[0m:[36m256[0m>    [1;31mSymbol not found[0m 
+ [1;31m[W][0m                <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m                <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m             <[31melfsh_get_segment_by_type[0m@[32mpht.c[0m:[36m290[0m>      [1;31mUnable to find PHDR by type[0m 
+ [1;31m[W][0m               <[31melfsh_get_symbol_by_name[0m@[32msymbol.c[0m:[36m256[0m>    [1;31mSymbol not found[0m 
+ [1;31m[W][0m                <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m                <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m             <[31melfsh_get_segment_by_type[0m@[32mpht.c[0m:[36m290[0m>      [1;31mUnable to find PHDR by type[0m 
+ [1;31m[W][0m               <[31melfsh_get_symbol_by_name[0m@[32msymbol.c[0m:[36m256[0m>    [1;31mSymbol not found[0m 
+ [1;31m[W][0m                <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m                <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m             <[31melfsh_get_segment_by_type[0m@[32mpht.c[0m:[36m290[0m>      [1;31mUnable to find PHDR by type[0m 
+ [1;31m[W][0m               <[31melfsh_get_symbol_by_name[0m@[32msymbol.c[0m:[36m256[0m>    [1;31mSymbol not found[0m 
+ [1;31m[W][0m                <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m                <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m             <[31melfsh_get_segment_by_type[0m@[32mpht.c[0m:[36m290[0m>      [1;31mUnable to find PHDR by type[0m 
+ [1;31m[W][0m               <[31melfsh_get_symbol_by_name[0m@[32msymbol.c[0m:[36m256[0m>    [1;31mSymbol not found[0m 
+ [1;31m[W][0m                <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m                <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m             <[31melfsh_get_segment_by_type[0m@[32mpht.c[0m:[36m290[0m>      [1;31mUnable to find PHDR by type[0m 
+ [1;31m[W][0m               <[31melfsh_get_symbol_by_name[0m@[32msymbol.c[0m:[36m256[0m>    [1;31mSymbol not found[0m 
+ [1;31m[W][0m                <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m                <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m   <[31melfsh_get_section_by_name_withlist[0m@[32msection.c[0m:[36m244[0m> [1;31mSection not found[0m 
+ [1;31m[W][0m   <[31melfsh_get_section_by_name[0m@[32msection.c[0m:[36m276[0m>  [1;31mSection not found[0m 
+ [1;31m[W][0m             <[31melfsh_get_symbol_by_name[0m@[32msymbol.c[0m:[36m256[0m>    [1;31mSymbol not found[0m 
+ [1;31m[W][0m              <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m              <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m          <[31melfsh_get_symbol_by_name[0m@[32msymbol.c[0m:[36m256[0m>    [1;31mSymbol not found[0m 
+ [1;31m[W][0m           <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m           <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m          <[31melfsh_get_symbol_by_name[0m@[32msymbol.c[0m:[36m256[0m>    [1;31mSymbol not found[0m 
+ [1;31m[W][0m           <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m           <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m           <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m           <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m           <[31melfsh_get_dynsymbol_by_name[0m@[32mdynsym.c[0m:[36m304[0m> [1;31mSymbol not found[0m 
+ [1;31m[W][0m           <[31melfsh_get_section_by_name_withlist[0m@[32msection.c[0m:[36m244[0m> [1;31mSection not found[0m 
+ [1;31m[W][0m          <[31melfsh_get_section_by_name[0m@[32msection.c[0m:[36m276[0m>  [1;31mSection not found[0m 
+ [1;31m[W][0m   <[31melfsh_relocate_etrel_section[0m@[32mrelinject.c[0m:[36m305[0m> [1;31mCant find inserted section in ET_EXEC[0m 
+ [1;31m[W][0m   <[31melfsh_relocate_object[0m@[32mrelinject.c[0m:[36m376[0m>    [1;31mUnable to relocate section[0m 
+ [1;31m[W][0m   <[31melfsh_inject_etrel_hash[0m@[32mrelinject.c[0m:[36m688[0m>  [1;31mUnable to inject ET_REL with list[0m 
+ [1;31m[W][0m   <[31mcmd_relinject[0m@[32mreladd.c[0m:[36m62[0m>                [1;31mFailed to inject ET_REL with workspace[0m 
+ [1;31m[W][0m   <[31mvm_execscript[0m@[32mloop.c[0m:[36m126[0m>                 [1;31mCommand execution failed[0m 
+ [E] Command execution failed
+
+
+ [E] Script execution failed 
+

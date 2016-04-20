@@ -1,0 +1,39 @@
+#!evarista
+
+#print ENTERED CALLGRAPH-WALK
+
+cmp $# 2
+jne end
+
+set $func $hash[$2_functions:$1]
+set $hash[visitedfuncs:$1] 1
+print Entering FUNCTION: $func
+
+#graph bloc $func.vaddr
+cfg-walk $func.vaddr $2
+graph bloc $func.vaddr
+
+quiet
+
+foreach $link of $func.outlinks
+
+  # Dont analyse extern functions
+  cmp $link.scope SCOPE_GLOBAL
+  je next
+
+  set $nextfunc $link.id
+
+  set $addr $nextfunc.vaddr
+  set $found $hash[visitedfuncs:$addr]
+  cmp $found 1
+  je next
+
+  callgraph-walk $addr $2
+
+next: forend
+
+return 0
+
+end:
+print This function needs two parameters
+quit

@@ -1,0 +1,33 @@
+#!../../evarista/evarista32
+
+sdir .
+#quiet
+#profile enable warn
+
+vlist
+
+cmp $# 2
+
+vlist
+jne end
+
+print Fact with params : 
+print $1 $2
+mul $2 $1
+set $2 $_
+sub $1 1
+cmp $1 1
+je result
+print Variables at current iteration : 
+print $1 $2 $_
+factorial $1 $2
+quit
+
+end:
+print This program needs 2 parameters
+quit
+
+result:
+print Factorial result:
+print $2
+quit

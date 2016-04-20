@@ -1,0 +1,404 @@
+
+			------------------------
+			Changelog file for ELFsh
+			------------------------
+
+
+Changes in intermediate beta versions are listed in the first public version
+they appear.
+
+0.71a1:
+-------
+ - Added    : Now loads dependences when loading a file (also added deps API)
+ - Core     : Change in the id naming scheme of objects
+ - Core     : Changed elfsh_inject_etrel_withlist for using hashes
+ - Core     : Removed lists a bit everywhere (elfshjob, elfshobj) to use hashes
+ - Added    : Improved libhash API (5 more functions !)
+
+0.7a10-cela:
+------------
+ - Bugfix   : Added sanity checks to elfsh_load_hdr()
+ - Core     : Now save memory as much as possible when top-injecting sections
+
+0.7a9-anjo:
+-----------
+ - Core     : Improved the symbol priority resolving using linkmap in e2dbg
+
+0.7a8-moto:
+-----------
+ - Bugfix  : fixed pre-interp issues on relinjection (bug #18)
+ - Added   : ELFSH_SELECT_INJECTION macro
+
+0.7a7p2:
+--------
+ - Bugfix  : bss.c - Fixed SIGSEGV on fixup with enabled debugging
+ - Bugfix  : libelfsh/include/libelfsh-internat.h - fixed ELFSH_PROFILE_ERR and XCLOSE
+             - removed compilation warnings
+             - added support for strerror for FreeBSD
+ - Bugfix  : copy.c - added missing file->fstat, file->fd, file->shtrb
+ - Bugfix  : bug #3 fixed
+ - Bugfix  : Modflow - fixed profiling error when recognition of ptr functions was enabled
+
+0.7a7p1:
+--------
+ - Bugfix  : Added missing libmjollnir
+ - Bugfix  : Removed double definition of ELFSH_EDITION
+ - Bugfix  : Fixed SIGSEGV after strip/save (by zg)
+ - Added   : New opperand in libasm - i386_jp/0x8a
+ - Core    : elfshobj_t contains struct stat for fstat() of the object
+ - Core    : switched sht_rebuild.c to file->fstat.st_size
+ - Bugfix  : Fixed SIGSEGV on set 1.hdr.arch 3 on corrupted binaries
+ - Bugfix  : Fixed SIGSEGV after sstrip/save
+
+0.7a6p3:
+--------
+ - Added   : libmjollnir for dress-like features and other usefull stuff (WIP)
+
+0.7a6p2:
+--------
+
+ - Bugfix  : Modflow profiling errors
+ - Added   : New opperands in libasm on x86 i386_bswap/i386_shld_rmv_rv_cl/
+    => i386_bsf
+ - Bugfix  : libui/color.c vm_colorget segfaults if curtok > COLOR_TOKENS
+ - Added   : Prototype of recognisince of pointer functions in modflow
+ - Bugfix  : vm/disasm.c display_instr, world.curjob->proc was not initialised
+ - Core    : small code cleanup 
+
+0.7a6p1:
+--------
+ - Added  : Support for FreeBSD
+
+0.7a :
+------
+ - Added  : Dynamic entries lookup by type
+ - Core   : Now hijack __libc_start_main instead of main (works on stripped)
+ - Added  : Full stepping support on x86
+ - Bugfix : Corrected backtrace onthefly (e2dbg/user separation)
+ - Added  : Registers as variables on breakpoint/step hit
+ - Added  : vm_lookup_bp (breakpoint lookup by symbol / id)
+ - Added  : display command
+ - Core   : Now 2 different commands for stack dumping (stack vs dbgstack)
+ - Core   : Now supporting static and runtime scripts
+ - Core   : New help system
+ - Added  : redir without parameters print redirections list in current file
+ - Core   : Included libhashelfsh in libelfsh
+ - Added  : Watchpoints
+ - Bugfix : Various bugs related to the variables type system
+ - Added  : Runtime SHT/PHT extension for the ELF format
+ - Added  : rsht/rpht commands and scripting objects
+ - Bugfix : corrected elfsh_error and io.buf accesses when not using readline
+ - Added  : --More--
+ - Added  : Colors (by mxatone)
+ - Added  : log command (can save sessions i/o)
+ - Bugfix : full testsuite working again
+ - Added  : a Real e2dbg command for the debugger
+ - Added  : More variable API (vm/variables.c)
+ - Added  : Added variable $SHELL and $EDITOR with adaptation of configure
+ - Added  : better completion (constants, ELF objects ..)
+ - Added  : Multiple workspaces with hotkey (^X)
+ - Added  : alert command for color events
+ - Added  : Full support (elf + scripting) for version tables (by mxatone)
+ - Core   : Dedicated heap for the debugger (now link with libmalloc-e2dbg.a)
+ - Core   : Dedicated thread for the debugger
+ - Added  : start command for starting the debuggee program
+ - Added  : empty line will now repeat the last command
+ - Core   : Support of aspect vectors (array of hooks) saved in vectors hash table
+
+0.65rc1 (August 1st 2005) :
+---------------------------
+ - Added  : Support for variables (and $_ variable)
+ - Core   : Slighly modified vm_lookup_param() interface for variable support
+ - Added  : compare (cmp) command
+ - Added  : control flow (jmp, je, jne, jg, jl, jge, jle commands)
+ - Added  : Label support for jmp instructions
+ - Added  : Variable indexes capability
+ - Added  : Script parameters support
+ - Added  : implicit variable conversions from string to integer 
+ - Added  : flowjack command in modflow
+ - Added  : double variables ($$var) : assign variables to the names of others
+ - Added  : $# variable (argc)
+ - Core   : print without parameter now goes to next line
+ - Added  : Possible dynamic convertion into RAW object
+ - Core   : More checks before launching script (resolve bug reported by truff)
+ - Added  : insert command (can insert sections and symbols in scripting)
+ - Core   : OpenBSD fixes (by mjc) and BeoS patch (by zadig)
+ - Added  : remove command (can remove symbols and sections in scripting)
+ - Bugfix : Stripping now OK
+ - Added  : Flush command
+ - Added  : Optional size parameter to 'write' command
+ - Added  : Help handler for modules (with modhelp command)
+ - Added  : elfsh_symtab_endianize (for advanced cross endianness support)
+ - Added  : configure by hand
+ - Bugfix : Better cross-endianizing support
+ - Core   : ELF64 support
+ - Added  : Sparc64 relocation types ASCII tables
+ - Core   : ET_REL injection / PLT infection hooks support
+ - Core   : internal hook API (vm_register_plthook / vm_register_relhook)
+ - Added  : ELF binaries mere-OS fingerprinting
+ - Bugfix : Now copy file before saving (avoid unwanted stripping in CWF)
+ - Bugfix : SPARC ALTPLT 'relplt bug' fixed on solaris. (thx dvorak for help ;)
+ - Added  : Support for extended PHT types (recent pax/binutils compat)
+ - Added  : PHDR insertion API
+ - Bugfix : No more 'quit' at the end of script necessary
+ - Core   : Virtual interface for I/O (vm/io.c)
+ - Bugfix : Module commands were not well executed in loops (reported by yannmalcom)
+ - Added  : Network support (initiated by yannmalcom)
+ - Added  : Shared working files
+ - Bugfix : $_ value were not assigned correctly on non-immed types in atomic commands
+ - Core   : Lazy types for CHAR, SHORT, LONG (part of 32/64bits interface)
+ - Added  : ASCII tables relocations types for MIPS, ALPHA and IA64 
+ - Added  : PLT hijacking on ALPHA
+ - Core   : Extended elfsh hooks to static hijack and altplt hijack handlers
+ - Core   : Changed elfsh_insert_section() return type (now elfshsect_t *)
+ - Core   : Changed option handler for allowing multiple regexp for D command
+ - Added  : 'source' command now execute an external script in the same job 
+ - Added  : "$!' command now contain the last loaded file id
+ - Added  : remove command and API for PHT entries
+ - Added  : New PaX safe control flow hook for x86
+ - Added  : Now compute dynsym symbols vaddr when new version of ld let them blanks
+ - Core   : (sk) 20/04/2005 display_instr prototype and function modification
+ - Added  : CFLOW on MIPS
+ - Core   : In-process scripting capability
+ - Added  : Macros using the scriptsdir command
+ - Core   : Compatibility with the most recent binutils/glibc
+ - Added  : vm_exec_str() function API
+ - Core   : elfsh/e2dbg profiler implied changes in the error handling
+ - Added  : EXTPLT technique on x86
+ - Added  : workspace support
+ - Core   : Now 2 stage relocation engine
+ - Added  : EXTSTATIC technique (static files extension)
+ - Added  : ET_REL injection into memory
+ - Added  : EXTPLT is now compatible with ET_REL injection into memory
+ - Added  : Insertion and removing of breakpoints for x86
+
+
+0.51b3 (August, 21, 2003)
+------------------------
+ - Bugfix : Fixed 'Malloc problem' on Solaris when using postbss injection
+ - Bugfix : patched cmdline bug when displaying sections after injecting symbols
+	=> no segfault in r, c, and st commands on solaris :>
+ - Added  : 'r' command now print addend on Sparc
+ - Fixed paths in Makefile as requested by Gentoo
+ - Bugfix : Take care that SHT do not overlap newly injected unmapped section
+
+
+0.51b2 (August, 15, 2003)
+-------------------------
+ - Core   : new elfsh_sort_symtab(), now use libc's quicksort (by spacewalker)
+ - Bugfix : now detect bad scripts looking at the first line
+ - Bugfix : Fixed incorrect size check in elfsh_get_dynentry_string()
+ - Bugfix : Fixed missing' -D' in readline Makefile variables
+ - Bugfix : Fixed section link when reconstructing the symtab
+ - Core   : Clarified strtab interface (now elfsh_get_strtab());
+ - Bugfix : Fixed injected symbol string bug on stripped binaries.
+ - Added  : Full support for .dynamic flags and non-standard tags
+ - Added  : elfsh_reverse_metasym(elfshobj_t *file, u_int vaddr, int *off)
+ - Added  : modflow  : a control flow block builder
+ - Added  : modgraph : can output control flow graph generated by modflow
+ - Added  : command 'redir' (for function hijacking)
+ - Added  : New ALTPLT technique (build .orig.plt and inject old_funcname symbols)
+ - Bugfix : Special case for STT_SECTION symbols used in ET_REL injection/relocation
+ - Added  : working ET_REL injection on SPARC
+
+
+0.5b8 (May, 19, 2003)
+---------------------
+ - Added  : Section injection by index
+ - Added  : Relocation entry insertion
+ - Core   : Better .rel* output (now print only symname)
+ - Added  : SHT sorting for ET_REL object
+ - Bugfix : Added missing space in command 'print'
+ - Added  : handlers for sctndx field of symtab ent
+ - Added  : Wrote elfsh-ref.txt
+ - Added  : ET_REL injection into ET_EXEC
+ - Added  : Fix _end when injected symbol st_value > _end
+ - Added  : ~ before every command in the script output file
+ - Bugfix : Check if dyn.val < dynstr.size before printing dynamic string
+ - Added  : stop command (useful for debugging)
+ - Core   : New arch independant GOT interface
+ - Added  : SET/GET by name for SHT, Sections, GOT, CTORS, DTORS, SYMTAB, DYNSYM
+ - Added  : Support for cross-endianess binaries (by phix@hush.com)
+ - Added  : Sparc relocation switch (by thegrugq)
+ - Core   : merged various code stubs into elfsh_shift_symtab()
+ - Bugfix : fix disasm.c compilation problem when libasm is not used
+ - Core   : elfsh_create_symbol() now takes one more parameter
+ - Core   : elfsh_create_section_header() is now elfsh_create_shdr()
+
+
+0.5b6 (March, 23, 2003)
+-----------------------
+ - Added  : A lot of tiny function to get/set fields in various headers .
+ - Added  : scripting
+ - Added  : .interp write access
+ - Added  : File access by index in file table
+ - Added  : RW script API for got/ctors/dtors/symtab/dynsym/ehdr/shdr/phdr/dynamic
+ - Added  : print and info commands
+ - Added  : info target in root Makefile
+ - Added  : comments support in scripts
+ - Added  : regression tests script in testsuite
+ - Added  : atomic arithmetic commands (add/sub/mul/div/mod)
+ - Added  : symbol resolve as immediate value
+ - Added  : ELFMACROS can be resolved as immediate value (new struct : t_const)
+ - Added  : elfsh_dyn target in the elfsh's Makefile (for embedded elfshellz ;)
+ - Core   : RW support for new PAX flags emplacement(and code moved in libelfsh)
+ - Core   : New API for RW section flags access .
+ - Core   : Now print numerical value if field type is unknown
+ - Core   : Fixup command
+ - Core   : Timestamp on all entries
+ - Added  : Compile without readline possible
+ - Core   : Changed option fetching engine (even more clean now)
+ - Core   : Created the world structure (useful for modules engine)
+ - Added  : Variable parameter command support (print and exec commands uses it)
+ - Added  : findrel command : display all the absolute reference of the file
+ - Added  : command redirection API
+ - Core   : Changed elfsh typenames, the object name format is now : elfshobjname_t
+ - Added  : Full module support
+ - Change : Better (un)load and switch (no list parsing, now use hashtable)
+ - Added  : support for ELF objects with buggy header
+ - Added  : support for \xNNN patterns in string constants
+ - Added  : strip and sstrip command (sstrip = strip + shtrm)
+ - Change : Moved elfsh_get_dynentry_info() into vm_dynentinfo()
+ - Change : Now can X and D on section[0] (at file offset = 0 and vaddr = 0)
+ - Added  : ELF API for .dynsym, .symtab, and SHT entries name
+ - Added  : Shell modif for section data, section name and symbols name
+ - Added  : Raw data RW in scripting (offset possible, no specified size needed ;)
+ - Added  : Append and Extend commands
+ - Added  : Better sorting code and symtab SECTION entry synchro with SHT values
+ - Change : Changed print so that we can print objects values in the string
+ - Contrib: modremap.c (by spacewalker)
+ - Added  : Lazy object typing
+ - Change : Improved remapping code using section type based heuristics
+
+
+0.5b3 (ML release on January, 26, 2003)
+---------------------------------------
+ - Bugfix : Better SHT reconstruction .
+ - Bugfix : Fixed some warning due to -Wall .
+ - Added  : regx for PHT view .
+ - Added  : Tell if the sht has been reconstructed or not .
+ - Added  : disassembly (using libasm by sk@devhell.org)
+ - Added  : regx in disassembling command line option .
+ - Added  : Inverse symbol lookup using libasm-callback feature .
+ - Added  : RVA disassembling (precise RVA with :rva at the end of regex)
+ - Added  : Range scanning (precise size with %size at the total end of regx)
+ - Added  : elfsh_get_symbol_by_value();
+ - Added  : int	elfsh_get_vaddr_from_foffset(Elfsh32_Obj *file, u_int foffset);
+ - Added  : elfsh_insert_section_header() now returns used range
+ - Added  : elfsh_get_sym_from_shtentry();
+ - Added  : elfsh_create_symbol() now returns a symbol instead of a ptr
+ - Added  : int	elfsh_fixup_symtab(Elfsh32_Obj *file);
+ - Added  : Elfsh32_Sect *elfsh_rebuild_strtab(Elfsh32_Obj *file)
+ - Added  : -w option to acknowledge file modification
+ - Added  : support range scanning using file offsets and vaddr for -D option
+ - Added  : -q (quiet) option, for tiny screens :-)
+ - Added  : PAX bits support in ELF header
+ - Added  : First interactive mode (load/unload/list/save/switch/quit)
+ - Change : Better Makefile hierarchy for testsuite
+ - Added  : Comment section support
+ - Change : elfsh_get_symbol_offset() is now elfsh_get_symbol_value()
+ - Change : More cross-reference in .symtab and .rel.* displays .
+ - Added  : Arrays/variables support with .rodata match in -X
+ - Added  : Section injection by top cap (gr33ts to zilvio for the tekn1k)
+ - Added  : Hashtables support
+ - Change : Option name scanner rewrite (now hash based)
+
+0.43b (June, 05, 2002)
+----------------------
+ - Bugfix : Improved documentation and fixed typos .
+ - Added  : SHT reconstruction code example in the testsuite .
+ - Bugfix : Added chmod in the install target of the main Makefile .
+
+0.43a (June, 01, 2002)
+---------------------
+ - Added  : Elfsh32_Obj *elfsh_map_obj(char *new_filename);
+ - Added  : int elfsh_save_obj(Elfsh32_Obj *file, char *new_filename);
+ - Added  : Support full hexdump for object without symtab .
+ - Added  : elfsh_raw_write() .
+ - Added  : GOT rw API .
+ - Core   : Improved PLT interface .
+ - Added  : CTORS and DTORS rw API .
+ - Added  : ELF header rw API
+ - Added  : .sh_strtab and .strtab string rw API .
+ - Bugfix : Now support hexdump on non mapped sections (thx to kad for report)
+ - Bugfix : Special output case for PLT entry
+ - Added  : Symtab rw API .
+ - Added  : testsuite for GOT, CTORS, DTORS and SYMTAB EXTEND .
+ - Added  : Program header rw API and Section header rw API .
+ - Added  : Section mapped/unmapped injection support with testsuite
+ - Added  : Section header table removing support .
+ - Output : Dynamic entry types short print .
+ - Output : Double output for program header table .
+ - Core   : Improved pht interface : elfsh_get_parent_segment() and elfsh_segment_is_parent() .
+ - Output : Inproved Relocation outputs .
+ - Bugfix : Forgotten the shortcut -st for -sym, thanks to kad again ;-)
+ - Added  : Minimal SHT reconstruction .
+ - Added  : True documentation !
+
+0.39 (March, 02, 2002)
+----------------------
+ - Core   : Now use homemade Elf32_Sect object to describe sections
+ - Core   : Every homemade structure are now called Elfsh32_name .
+ - Added  : ctors/dtors view and got/ctors/dtors symbol matching with regx .
+ - Added  : symbol and dynamic symbol names output for STT_SECTION symbols when using -sym and -dynsym
+ - Added  : parent section name in the (dyn) symbol table output .
+ - Added  : better symbol matching in the relocation sections output .
+ - Core   : Now performing match on the whole line
+ - Added  : alignement print for sections and program headers .
+ - Added  : Using section names in lfsh_reverse_symbol() if no symtab
+ - Added  : General improved output .
+ - Added  : elfsh_raw_read() .
+ - Added  : variables printing with symbol matching
+ - Added  : hexadecimal/ascii viewer for Function and Sections (-X)
+
+0.3 (December, 12, 2001)
+------------------------
+ - section loading API major update (look at the doc !)
+ - rights retreiving API major update (look at the doc !)
+ - name retreiving API major update (look at the doc !)
+ - better error handling code
+ - symbol -hash- lookup debugged :)
+ - global offset table API and displaying
+ - stabs displaying cleaning
+ - multiple relocation section support
+ - multiple notes sections support
+ - libname change ! elflib is now elfshlib
+ - no more elfdump ! here is elfsh
+ - corrected bug in relocation sections displaying for relocatable objects
+ - "elf_" prefixed functions are now prefixed with "elfsh_"
+ - Makefile sources tree cleaning
+ - ELFOBJ is now ELf32_Obj
+ - New objects: Elf32_Func, Elf32_Sect, Elf32_Plt, ELf32_PLTent
+ - syscall wrapping MINI-API : XALLOC, XSEEK, XREAD, XOPEN
+ - moved constant arrays from libelfsh to elfsh .
+ - added an interval macro .
+ - change the error system a bit .
+ - changed the lookup method for .interp and .dynamic (use pht now)
+ - coded sort function for symbols (sort by size or by addr)
+ - coded symbol table merging functions .
+ - libelfsh now use automake and autoconf .
+ - ported to solaris !! (stabs unimplemented on solaris) .
+
+0.21b (June, 13, 2001)
+----------------------
+ - netbsd/freebsd/openbsd port
+ - .interp support
+ - .note support
+ - ELFsh syntax improved
+ - First documentation writing
+
+0.2b (May 2001)
+---------------
+ - section search by name
+ - dynamic section analysis
+ - symbol/dynsymbol inverse lookup
+ - section and segments right retreiver
+ - stabs support
+ - relocation entries analysis
+ - pattern matching
+ - elf magic checking
+ - better error handling
+ - cool options handling macros system
+ - better dependancies checks
+ - shared library (libelf.so) in Makefile
+ - Extra free() removed in elf_unload_obj (elf.c)

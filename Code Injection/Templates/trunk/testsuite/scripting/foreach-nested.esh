@@ -1,0 +1,26 @@
+#!../../elfsh/elfsh32
+
+#profile enable warn
+#quiet
+
+add $list[test1] Intel
+add $list[test1] Alpha
+add $list[test1] Mips
+
+add $list[test2] HEHE
+add $list[test2] HOHO
+
+lists test1
+lists test2
+
+foreach $element of test1
+
+  print List contains element : $element
+
+  foreach $element2 of test2
+    print List2 contains element : $element2
+  forend
+
+forend
+
+quit

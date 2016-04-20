@@ -1,0 +1,6 @@
+#!evarista32
+
+print Welcome to Evarista DEBUG build
+exec sleep 1
+source eva-main.esh $1
+

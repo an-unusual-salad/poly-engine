@@ -1,0 +1,34 @@
+#!../../elfsh/elfsh32
+
+# $Id: graph-tests.esh,v 1.3 2007-05-19 18:28:10 thor Exp $
+
+#quiet 
+
+# don't popup any windows, just generate .png files
+configure graph.autoview 0
+configure libasm.output.att.margin 5
+
+nocolor
+
+load $1
+
+# analyse the object and graph function dependecies
+analyse
+graph
+
+# get number of symbols in symtab
+set $entnbr 1.sht[.symtab].size
+div $entnbr 1.sht[.symtab].entsize
+
+print $entnbr
+
+# walk it and dump all functions
+foreach $idx of 0 until $entnbr
+	cmp 1.symtab[$idx].type 2
+	jne skip
+        print $idx is 1.symtab[$idx].name
+	set $fname 1.symtab[$idx].name
+	graph bloc $fname
+skip:
+forend
+

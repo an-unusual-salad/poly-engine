@@ -1,0 +1,22 @@
+#!../../../../elfsh/elfsh32
+
+load a.out
+load simple.o
+
+reladd 1 2
+
+#redir main fake_main
+#redir __stack_smash_handler fake_stack_smash_handler
+#redir __libc_start_main fake_libc_start_main
+#redir strcpy fake_strcpy
+
+redir puts fake_puts
+redir legit_func fake_legit_func
+
+save fake_aout
+
+# uncomment just for development purpose made easier
+#exec /sbin/paxctl -c fake_aout
+#exec /sbin/paxctl -permxs fake_aout
+
+quit

@@ -1,0 +1,117 @@
+
+			        #     #    #   #  # # ##	
+					              ##			
+						    #### 
+                                                ########
+					################
+				########################
+				ERESI TODO File        #
+                                ########################
+
+This file is grouping a couple of features that could be implemented
+in the future. 
+
+	. TLS variables API
+	. Use MMAP_FIXED mappings in debugger heap
+	. Better rights than rwx for runtime injected phdr (try double-map)
+	. Fix all warnings on all OS and (re)compile on HPUX
+
+[quick]	. Use sigaction's context to populate reg's var on SIGINT/SIGSEGV
+[quick]	. be able to change the compiler and compiling options
+!!!	. Multiple BSS : symbol injected many times in find_bsslen (fixup_sctndx really useful ?)
+!!!	. Put doxygen comments and generate the ELF shell reference manual
+!!!	. Update manpage
+
+	<----- Here release 0.7-portable
+
+[Main TODO]
+	. Support step over, step into, step in sources
+	. Conditions on breakpoints 
+	. Add ALTGOT vector (need a small fix in the alpha algorithm)
+	. Finish ET_REL for MIPS
+	. Complete MIPS SHT/DYNAMIC types ASCII's
+	. Better function hijacking to replace breakpoint opcodes
+	. Be able to add new internal types using the script language
+	. Be able to breakpoint a debugger function
+	. More high level control flow : while if else if endif end
+	. Hash tables working with 'foreachof' and 'eol'
+	. File reconstruction from memory
+      	. Support file building from scratch and support ET_REL injection on it
+	. Signal proxying working in multithreads
+      	. SUN Version section rw API (and add it to the hierarchy)
+	. DWARF support and step in sources
+	. Packer/Unpacker hook interface (Generalized hooking VM interface)
+	. Hook command (include hlist)
+	. Watchpoints on memory (problem: debug registers are ring0 only)
+	. Use a runtime symtab/strtab for memory modifications
+	. Signal proxying (when the debuggee set signals)
+	. support X/x number types [regx] command and D regx regx commands
+	. Replace all #ifdef __DEBUG*__ by ELFSH_PROFILE_DEBUG() calls
+	. e2dbg scripts from cmdline (filexist, $var1_blabla$var2 format)
+	. Better runtime EXTPLT (without mprotect)
+	. unredir and undisplay command
+	. b __guard@libc.so.6 format
+	. Be able to bt without fp
+	. Include hooks in scripting language
+	. ltrace multiarch
+	. add syntax explaination in help
+	. e2dbg VS gdb (undisplay, bt with core, frame command, call command)
+	. uuprint command
+	. add ~ expansion
+	. Recode paxctl in elfsh script
+	. add vsyscall table support : http://lwn.net/Articles/30258/
+	. Execution of script located in .elfsh.d/ from IMODE 
+	. Leave command : exit the debugger by unmapping it
+
+[porting]
+	. Debug PaX-safe third-type injection on SPARC / ALPHA
+	. CFLOW for SPARC and ALPHA
+	. Dumpregs, Breakpoints, Backtrace on SPARC
+	. EXTPLT / ET_REL into ET_DYN for SPARC
+	. Dumpregs, Breakpoints, Backtrace on ALPHA
+	. EXTPLT / ET_REL to ET_DYN on ALPHA
+	. Dumpregs, Breakpoints, Backtrace on MIPS
+	. EXTPLT / ET_REL into ET_DYN for MIPS
+	. Full support for HPPA, PPC, ARM, IA64, AMD64
+
+[minor bugs]	
+. BUG : remove memleaks (VALGRIND!)
+. BUG : reported by emperor (shnum, phnum, shsize modifs without data insertion)
+. BUG : Check cmd_connect error handling
+. BUG : NET client's (private) objects aren't unloaded on disconnection
+. BUG : NET shell prompt displayed twice (! cmd) 
+. BUG : multiple workspace on DUMP connection (actual->data->active && network.c:761)
+. BUG : DUMP + e2dbg + cont/b/... 
+. BUG : Cannot list notes anymore
+
+[less important features TODO]
+	. LKM & static kernel infection
+	. DYNAMIC insertion API
+	. Be able to call dtrace on Solaris
+	. Support ELF32 / ELF64 at the same time
+	. Improve completion (do better tables in tables.c)
+	. CTORS, DTORS entry insertion API (need to change code references ..)
+	. Section data, got, ctors, dtors, dynamic, rel*, plt removing ELF API
+	. REMOVE VM commands for section data, dynsyms, got, ctors, dtors, dynamic, rel*, plt
+      	. md5 known blocks to rebuild true symbol names in static binaries
+	. SUN/x86 objets translation into GNU/x86
+	. Libasm handlers scripting
+	. Support 'addr' L2 field for got, ctors, dtors, rel, dynsym, sym (return the object address)	 
+	. Advanced relocation entries lookup in grammar.c						 
+	. INSERT VM commands for dynsyms, got, ctors, dtors, dynamic, rel*, plt, function
+	. elfsh_export_symbol() (copy .symtab entry as a .dynsym entry)
+
+[SHT RECONSTRUCTION]
+[SHT rebuilding : use ELFsh 0.43b for a better implem of this feature]
+
+ 	. Bad .dynamic insertion => .shstrtab sh_offset += 9 (why ?)
+	. fix bug in mapped_offset (offset not updated)
+	. Bad sh_off in elfsh_rebuild_sht() => bad output file (why ?)
+	. rebuild .text and .data using PHT (warn: size unknown!)
+	. rebuild .init and .fini using .dynamic (warn: size unknown!)
+	. consider the padding (max 3 bytes) in SHT reconstruct .
+	. correct the '|' thing in PHT linking perspective .
+	. Reconstruct .shstrtab if missing but SHT is present
+	. SHT reconstruction paper
+	
+

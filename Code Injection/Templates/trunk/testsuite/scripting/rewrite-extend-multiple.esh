@@ -1,0 +1,75 @@
+#!../../evarista/evarista32
+
+quiet
+
+#########################################
+# Declare some basic types to work with #
+#########################################
+# If the script fails, make sure you have the 
+# same as in $ERESI_ROOT/evarista/eva-typedecl.esh
+# or copy the latest definitions here 
+#########################################
+
+type listent          = key:string data:long next:*listent
+type list             = head:*listent elmnbr:int type:int linearity:byte name:string
+type hash             = ent:*listent size:int elmnbr:int type:int linearity:byte name:string
+type container        = id:int type:int nbrinlinks:int nbroutlinks:int inlinks:*list outlinks:*list data:long 
+type op               = len:int ptr:*byte sem:int name:string size:int content:int regset:int prefix:int imm:int baser:int indexr:int sbaser:string sindex:string isdst:int aspace:int scale:int st:int it:int oa:int
+type instr::container = ptrins:long proc:long name:string icode:int sem:long prefix:int spdiff:int wflags:int rflags:int ptr_prefix:long annul:int prediction:int nb_op:int op1:op op2:op op3:op op4:op op5:op op6:op len:int aop:int
+type bloc::container  = vaddr:caddr size:int symoff:int seen:byte
+type func::container  = vaddr:caddr size:int name:byte[64] first:*bloc md5:byte[34]
+type link             = id:oid type:byte scope:byte
+type irinstr::container = localid:int otherid:int
+
+# Write a few bytes in the ELF text section to be analyzed
+load /bin/ls
+write 1.section[.text].raw 0x50515253
+hexa   ^.text$%5
+disasm ^.text$%5
+
+set $curaddr 1.sht[.text].addr
+reflect 1.sht[.text].addr 2
+
+#verb
+
+# Change some fields in the instruction structures
+set $curid 42
+
+foreach $instr of $hash[instrlists:$curaddr]
+
+ print Processing next original item
+
+ rewrite $instr into
+  case instr(sem:0x4020)
+  into irinstr(localid:$curid)::irinstr(localid:$curid+100)
+  default print do nothing
+ rwtend
+ add $curid 2
+
+print
+print ***** Now extending transformed list *****
+print
+
+###
+### Problem, if transformed contains multiple items, the extended field is not properly cleaned up
+### from first iteration for "$irinstr.otherid" which makes the extend() not being called at 
+###
+foreach $irinstr of $list[transformed]
+  print IRINSTR befofe adding field:
+  print $irinstr
+  set $irinstr.otherid ($irinstr.localid+1)
+  print IRINSTR after adding field:
+  print $irinstr
+forend
+
+forend
+
+print
+print ***** Now printing original list after transformation *****
+print
+
+foreach $instr5 of $hash[instrlists:$curaddr]
+ print $instr5
+forend
+
+quit

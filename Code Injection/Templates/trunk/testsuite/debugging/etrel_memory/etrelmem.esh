@@ -1,0 +1,11 @@
+#!e2dbg
+
+load myputs.o
+switch a.out
+mode dynamic
+reladd a.out muputs.o
+profile enable warn
+redir puts myputs
+profile disable warn
+
+

@@ -1,0 +1,15 @@
+
+CFLAGS32 += -Wall 
+CFLAGS64 += -Wall 
+LIBASM_ENABLE_IA32 = 1
+CFLAGS_libasm += -DLIBASM_ENABLE_IA32=1
+LIBASM_PACKED_HANDLERS = 1
+MAKE=make
+RANLIB  = ranlib
+DLOPT		= -ldl
+DYNOPT		= -rdynamic
+BUILDOP = -DM32
+LDASMOPT	= -lasm
+LPTHREAD=	-lpthread
+BITS = 
+SHELL=  /bin/bash

@@ -1,0 +1,21 @@
+#!../../elfsh/elfsh32
+
+#quiet
+
+print Parameters : $1 $2 $3
+print 
+
+set $index 1
+
+loop:
+#profile enable warn
+cmp $index $#
+jl end
+load $$index
+dynsym printf
+unload $$index
+add $index 1
+jmp loop
+
+end:
+quit

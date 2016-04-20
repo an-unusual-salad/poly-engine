@@ -1,0 +1,35 @@
+
+Those are the new hooks to be created in LIBELFSH:
+
+MEMALLOC (u_int size, eresi_Addr*)					(libelfsh)
+--------
+
+		KERNEL					USER
+
+LINUX  		kernsh_alloc    			elfsh_runtime_map_unix
+BSD			/				elfsh_runtime_map_unix
+SOLARIS			/				elfsh_runtime_map_unix
+IRIX			/				elfsh_runtime_map_irix
+
+
+MPROTECT (eresi_Addr addr, uint32_t size, int prot)			(libelfsh)
+--------
+
+		KERNEL					USER
+
+LINUX		empty					elfsh_mprotect
+BSD		empty					elfsh_mprotect
+SOLARIS		empty					elfsh_mprotect
+IRIX		empty					elfsh_mprotect
+
+
+MUNPROTECT (elfshobj_t *file, eresi_Addr addr, uint32_t size)		(libelfsh)
+--------
+
+		KERNEL					USER
+
+LINUX		empty					elfsh_munprotect
+BSD		empty					elfsh_munprotect
+SOLARIS		empty					elfsh_munprotect
+IRIX		empty					elfsh_munprotect
+

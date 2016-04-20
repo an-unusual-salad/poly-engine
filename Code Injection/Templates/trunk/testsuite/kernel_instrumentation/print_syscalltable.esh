@@ -1,0 +1,22 @@
+#!../../kernsh/kernsh32
+
+openmem
+mode d
+
+type example1 = sys:int[320]
+inform example1 toto sys_call_table
+
+print $toto.sys[0]
+
+set $i 0
+
+boucle:
+
+cmp $i 2
+je end
+print $toto.sys[$i]
+add $i 1
+jmp boucle
+
+end:
+print "Bye !"

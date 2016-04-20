@@ -1,0 +1,16 @@
+#!../../e2dbg/e2dbg32
+
+b malloc
+b free
+start
+linkmap
+bt
+cont
+linkmap
+bt
+delete free
+delete malloc
+cont
+quit
+
+

@@ -1,0 +1,1225 @@
+#!/bin/sh
+#
+# Homemade configure file for the ERESI project
+# The ERESI team 2001-2010
+#
+# $Id$
+
+CHOSENBIT="0"
+STATIC="0"
+READLN="0"
+KERNSH="0"
+ERESI_NET="0"
+LIBMJOLLNIR="1"
+TESTING="0"
+GSTABS=""
+PREFIX=""
+OSVER=`uname -r | cut -d "." -f1`
+OSNAME=`uname -s`
+CONFIGFILE="config.h"
+VARSFILE="librevm/include/revm-vars.h"
+LIBVARSFILE="libelfsh/include/libvars.h"
+LPTHREAD="-lpthread"
+SHELL=`which bash`
+GENTOO=` uname -a | grep gentoo` 
+
+printHelp() 
+{
+    echo "Error: you MUST specify --enable-32, --enable-64 OR --enable-32-64."
+    echo
+    echo "   Available parameters :" 
+    echo
+    echo "   --enable-32-64    : Build both ELF32/64 capable shell."
+    echo "   --enable-32       : Build a ELF32 capable shell."
+    echo "   --enable-64       : Build a ELF64 capable shell."
+    echo "   --enable-readline : Link with readline"
+    echo "   --enable-network  : Build eresi server capability"
+    echo "   --enable-static   : Link in static."
+    echo "   --enable-testing  : Test ERESI without install"
+    echo "   --enable-dmalloc  : Link with Electric Fence."
+    echo "   --enable-m64      : Build ELFsh itself as 64bits binary (default: 32bits)"
+    echo "   --enable-gstabs+  : Enable gstabs+ support"
+    echo "   --enable-kernsh   : Build kernsh and libkernsh (linux only)"
+    echo "   --enable-ke2dbg   : Build ke2dbg kernel debugger (linux only)"
+    echo "   --use-etags       : Use etags"
+    echo "   --use-ctags       : Use ctags"
+    echo "   --use-cpp         : Build the project as C++"
+    echo "   --no-stackprot    : Use -fno-stack-protector gcc option"
+    echo
+    echo "   --libasm-ia32     : Enable libasm INTEL engine"
+    echo "   --libasm-sparc    : Enable libasm SPARC engine"
+    echo "   --libasm-mips     : Enable libasm MIPS engine"
+    echo "   --libasm-arm      : Enable libasm ARM engine"
+    echo "   --libasm-packed   : Pack handlers in a single file"
+    echo "   --libasm-unpacked : Keep handlers per source file"
+    echo
+    echo "   Available variables :"
+    echo
+    echo "   --set-shell       : Set your UNIX shell path."
+    echo "   --set-compiler    : Set your compiler path."
+    echo "   --set-editor      : Set your editor path."
+    echo "   --set-modpath     : Set your ELFsh modules path."
+    echo "   --prefix <path>   : Set prefix."
+    echo
+    echo "   All options are disabled by default."
+    echo
+    exit 1
+}
+
+if [ "$1" = "-h" -o "$1" = "--help" ] ; then
+	printHelp
+fi
+
+echo > $LIBVARSFILE
+echo > $VARSFILE
+echo > $CONFIGFILE
+
+echo "CFLAGS32 += -Wall " >> $CONFIGFILE
+echo "CFLAGS64 += -Wall " >> $CONFIGFILE
+
+while [ $# -ne 0 ]; do
+
+case "$1" in
+
+--enable-32-64*)
+if [ $CHOSENBIT = "1" ]; then
+    echo
+    echo "Error: enable-32 and enable-64 are incompatible"
+    echo "Use --enable-32-64 if you know what you are doing"
+    echo
+    rm -f $CONFIGFILE
+    exit
+fi
+
+echo  " [*] Enabling ELF64/ELF32 support"
+#BITS="-DERESI64"
+#echo  "//#define ELFSH64 1"			>> $LIBVARSFILE
+CHOSENBIT="1"
+BUILD_TARGET=""
+;;
+
+--enable-64*)
+if [ $CHOSENBIT = "1" ]; then
+    echo
+    echo "Error: enable-32 and enable-64 are incompatible."
+    echo
+    rm -f $CONFIGFILE
+    exit
+fi
+echo  " [*] Enabling ELF64 support"
+#BITS="-DERESI64"
+#echo  "//#define ELFSH64 1"			>> $LIBVARSFILE
+CHOSENBIT="1"
+BUILD_TARGET=all64
+MOD_TARGET=mod64
+;;
+
+
+--enable-32*)
+if [ $CHOSENBIT = "1" ]; then
+    echo
+    echo "Error: enable-32 and enable-64 are incompatible."
+    echo
+    rm -f $CONFIGFILE
+    exit
+fi
+echo  " [*] Enabling ELF32 support"
+#BITS="-DERESI32"
+
+echo  "//#define ELFSH32 1"		>> $LIBVARSFILE
+CHOSENBIT="1"
+BUILD_TARGET=all32
+MOD_TARGET=mod32
+;;
+
+
+--enable-network*)
+echo  " [*] Enable ERESI client/server capability"
+ERESI_NET="1"
+echo  "LDDUMPOPT32		= -ldump32"			>> $CONFIGFILE
+echo  "LDDUMPOBJ32		= ../libdump/libdump32.o"	>> $CONFIGFILE
+echo  "LDDUMPOPT64		= -ldump64"			>> $CONFIGFILE
+echo  "LDDUMPOBJ64		= ../libdump/libdump64.o"	>> $CONFIGFILE
+BITS=$BITS" -DERESI_NET"
+;;
+
+--libasm-ia32)
+echo " [*] Libasm IA32 engine"
+echo "LIBASM_ENABLE_IA32 = 1" >> $CONFIGFILE
+echo "CFLAGS_libasm += -DLIBASM_ENABLE_IA32=1" >> $CONFIGFILE
+LIBASM_ENABLE_CHOOSEN=1
+;;
+
+--libasm-sparc)
+echo " [*] Libasm SPARC engine"
+echo "LIBASM_ENABLE_SPARC = 1" >> $CONFIGFILE
+echo "CFLAGS_libasm += -DLIBASM_ENABLE_SPARC=1" >> $CONFIGFILE
+LIBASM_ENABLE_CHOOSEN=1
+;;
+
+--libasm-mips)
+echo " [*] Libasm MIPS engine"
+echo "LIBASM_ENABLE_MIPS = 1" >> $CONFIGFILE
+echo "CFLAGS_libasm += -DLIBASM_ENABLE_MIPS=1" >> $CONFIGFILE
+LIBASM_ENABLE_CHOOSEN=1
+;;
+
+--libasm-arm)
+echo " [*] Libasm ARM engine"
+echo "LIBASM_ENABLE_ARM = 1" >> $CONFIGFILE
+echo "CFLAGS_libasm += -DLIBASM_ENABLE_ARM=1" >> $CONFIGFILE
+LIBASM_ENABLE_CHOOSEN=1
+;;
+
+--libasm-packed)
+LIBASM_PACKED_HANDLERS=1
+;;
+
+--libasm-unpacked)
+LIBASM_PACKED_HANDLERS=0
+;;
+
+--enable-testing*)
+echo " [*] Enable compilation without install"
+echo "#define E2DBG_PATH             " \"`pwd`/libe2dbg/\" >> $VARSFILE
+echo "EXTRACFLAGS += -g3"				   >> $CONFIGFILE
+TESTING="1"
+;;
+
+--enable-readline*)
+echo  " [*] Enabling readline support"
+READLN="1"
+
+if [ -z "$GENTOO" ] ; then
+TERMCAP="-ltermcap"
+else
+TERMCAP=""
+fi
+
+if [ "${OSNAME}" != OpenBSD ] ; then
+echo  "READLN	        = 1"					>> $CONFIGFILE
+echo  "READLNOPT	= -DUSE_READLN"				>> $CONFIGFILE
+echo  "LDREADLNOPT	= -L/opt/sfw/lib/ -lreadline $TERMCAP"  >> $CONFIGFILE
+else
+echo  "LDREADLNOPT	= -lreadline $TERMCAP"			>> $CONFIGFILE
+fi
+echo  "LDUIOPT32	= -L../libui -lui32"                    >> $CONFIGFILE
+echo  "LDUIOPT64	= -L../libui -lui64"                    >> $CONFIGFILE
+;;
+
+--enable-ncurses*)
+echo  " [*] Enabling ncurses support"
+READLN="1"
+echo  "NCURSESLNOPT	= -DUSE_UI"		>> $CONFIGFILE
+echo  "LDNCURSESLNOPT	= -lncurses"		>> $CONFIGFILE
+;;
+
+--enable-termcap*)
+echo " [*] Enabling termcap support"
+TERMCAP="1"
+echo  "LDREADLNOPT  += -ltermcap" >> $CONFIGFILE
+;;
+
+--enable-static*)
+echo  " [*] Enabling static linking"
+echo  "STATOPT		= -static"              >> $CONFIGFILE
+echo  "STATOPT2		= -DUSE_STATIC"		>> $CONFIGFILE
+STATIC="1"
+;;
+
+--enable-dmalloc*)
+echo  " [*] Enabling dmalloc linking"
+echo  "EXTRAOPT		= $EXTRAOPT -ldmalloc"  >> $CONFIGFILE
+;;
+
+--enable-m64*)
+echo  " [*] Enabling ELFsh 64bits binary built"
+echo  "BUILDOPT		= -m64 -DM64"		>> $CONFIGFILE
+M64="1"
+;;
+
+--enable-gstabs*)
+echo  " [*] Enabling gstabs+ support"
+echo  "GSTABS		= -gstabs+"		>> $CONFIGFILE
+GSTABS="1"
+;;
+
+--use-etags*)
+echo  " [*] Enabling etags support"
+ETAGS="1"
+;;
+
+--use-ctags*)
+echo  " [*] Enabling etags support"
+CTAGS="1"
+;;
+
+--use-cpp*)
+echo  " [*] Enabling C++ built"
+echo  "CC		= g++"			>> $CONFIGFILE
+;;
+
+--no-stackprot*)
+echo " [*] Disabling gcc stack protection"
+echo "EXTRACFLAGS += -fno-stack-protector" >> $CONFIGFILE
+;;
+
+--set-shell*)
+shift
+echo  " [*] Setting UNIX shell to " $1
+echo  "#define ERESI_EXTSHELL        " \"$1\"		>> $VARSFILE
+SHELLSET="1"
+;;
+
+--set-editor*)
+shift
+echo  " [*] Setting editor to " $1
+echo  "#define ERESI_EDITOR        " \"$1\"		>> $VARSFILE
+EDITORSET="1"
+;;
+
+--set-compiler*)
+shift
+echo  " [*] Setting compiler to " $1
+echo  "CC		= " $1			>> $CONFIGFILE
+COMPILERSET="1"
+;;
+
+--set-modpath*)
+shift
+echo " [*] Setting ELFsh modules path to " $1
+echo "#define ERESI_MODPATH              " \"$1\"   >> $VARSFILE
+MODPATHSET="1"
+;;
+
+--set-lib-path*)
+shift
+echo " [*] Setting ELFsh library search path to " $1
+echo "#define ERESI_LIBPATH    		 " \"$1\"  >> $VARSFILE
+LIBPATHSET="1"
+;;
+
+--enable-stripped-log*)
+shift
+echo " [*] Enable stripped log"
+echo "#define ERESI_SLOG 1" 		      >> $VARSFILE
+SLOGSET="1";
+;;
+
+--enable-kernsh*)
+echo " [*] Enabling kernsh and libkernsh"
+if [ -e "$(which uname)" ] ; then
+arch=`uname -m`
+os=`uname -s`
+release=`uname -r`
+echo "" > kernsh/include/info.h
+echo "#ifndef __INFO_H__" >> kernsh/include/info.h
+echo " #define __INFO_H__" >> kernsh/include/info.h
+echo "" >> kernsh/include/info.h 
+echo "#define ARCH \"$arch\"" >> kernsh/include/info.h
+echo "#define OS \"$os\"" >> kernsh/include/info.h
+echo "#define RELEASE \"$release\"" >> kernsh/include/info.h
+
+if [ $os = 'Linux' ]; then
+    echo "" > libkernsh/include/libkernsh-info.h
+    echo "#ifndef __LIBKERNSH_INFO_H__" >> libkernsh/include/libkernsh-info.h
+    echo " #define __LIBKERNSH_INFO_H__" >> libkernsh/include/libkernsh-info.h
+    res=`expr match "$release" '2.4.*'`
+    if [ $res = 8 ]; then
+	echo "#define __LINUX_2_4__  1" >> libkernsh/include/libkernsh-info.h
+    else
+	echo "#define __LINUX_2_4__  0" >> libkernsh/include/libkernsh-info.h
+    fi
+    echo "" >> libkernsh/include/libkernsh-info.h
+    echo "#endif" >> libkernsh/include/libkernsh-info.h
+fi
+
+echo "" >> kernsh/include/info.h
+echo "#endif" >> kernsh/include/info.h
+KERNSH="1"
+fi
+;;
+
+--enable-ke2dbg*)
+kos=`uname -s`
+if [ $kos = 'Linux' ]; then
+ echo " [*] Enable ke2dbg kernel debugger"
+ echo  "USE_KE2DBG	= 1"		>> $CONFIGFILE
+else
+ echo "Error: ke2dbg currently only works on Linux, do not enable it on this machine"
+ exit
+fi
+;;
+
+--prefix*)
+shift
+PREFIX=$1
+;;
+
+--help*)
+CHOSENBIT="0"
+break;
+;;
+
+*)
+echo "Invalid configure '$1' option. Try --help."
+echo
+rm -f $CONFIGFILE Makefile
+exit 1
+
+esac;
+
+shift
+
+done
+
+if [ ! "$LIBASM_ENABLE_CHOOSEN" = 1 ];
+then
+echo " [*] Libasm IA32 engine"
+echo " [*] Libasm SPARC engine"
+echo " [*] Libasm MIPS engine"
+echo " [*] Libasm ARM engine"
+echo "LIBASM_ENABLE_IA32 = 1" >> $CONFIGFILE
+echo "LIBASM_ENABLE_SPARC = 1" >> $CONFIGFILE
+echo "LIBASM_ENABLE_MIPS = 1" >> $CONFIGFILE
+echo "LIBASM_ENABLE_ARM = 1" >> $CONFIGFILE
+fi
+
+if [ "$LIBASM_PACKED_HANDLERS" != "0" ] ; then
+echo " [*] Libasm Packed handlers"
+echo "LIBASM_PACKED_HANDLERS = 1" >> $CONFIGFILE
+else
+echo " [*] Libasm Unpacked handlers"
+echo "LIBASM_PACKED_HANDLERS = 0" >> $CONFIGFILE
+fi
+
+#
+# test for make/gmake support
+#
+if [ -z "$(which gmake)" ] ; then
+echo "MAKE=make" >> $CONFIGFILE
+else
+echo "MAKE=gmake" >> $CONFIGFILE
+fi
+
+if [ $CHOSENBIT = "0" ]; then
+    printHelp
+fi
+
+if  [ $READLN = "1" -a $ERESI_NET = "1" ]; then
+    echo
+    echo "Error: Readline and Distributed ELFsh are incompatible."
+    echo
+    rm -f $CONFIGFILE $VARSFILE
+    exit
+fi
+
+# Now do the OS dependant configuration
+case `uname` in
+
+SunOS*)
+
+if [ "$STATIC" = "0" ]; then
+    echo  " [*] Enabling dynamic linking."
+    echo  "DLOPT		= -ldl"   >> $CONFIGFILE
+fi
+
+    EXTRAOPT="$EXTRAOPT -lnsl -lsocket -lresolv"
+    echo "EXTRAOPT = " $EXTRAOPT	  >> $CONFIGFILE
+    echo "RANLIB  = ranlib"               >> $CONFIGFILE
+
+	;;
+
+Linux*)
+
+    echo "RANLIB  = ranlib"			>> $CONFIGFILE
+    echo  "DLOPT		= -ldl"		>> $CONFIGFILE
+if [ "$STATIC" = "0" ]; then
+    echo  " [*] Enabling dynamic linking."
+    echo  "DYNOPT		= -rdynamic"  >> $CONFIGFILE
+fi
+
+if [ "$ERESI_NET" = "1" ]; then
+    EXTRAOPT="$EXTRAOPT -lutil"
+    echo  "EXTRAOPT = " $EXTRAOPT	  >> $CONFIGFILE
+fi
+
+if [ "$PREFIX" = "" ]; then
+    PREFIX="/usr"
+fi
+
+
+;;
+
+FreeBSD*)
+
+    echo " [*] OS Version: $OSVER"
+    echo "RANLIB  = ranlib"               >> $CONFIGFILE
+    SHELL="/bin/sh"
+
+    if [ "$PREFIX" = "" ]; then
+	PREFIX="/usr/local/"
+    fi
+
+if [ "$STATIC" = "0" ]; then
+    echo  " [*] Enabling dynamic linking."
+    echo  "DYNOPT		= -rdynamic"  >> $CONFIGFILE
+fi
+
+if [ "$ERESI_NET" = "1" ]; then
+    EXTRAOPT="$EXTRAOPT -lutil"
+    echo  "EXTRAOPT = " $EXTRAOPT	  >> $CONFIGFILE
+fi
+
+if [ "$OSVER" = "4" ]; then
+ LPTHREAD="-lc_r"
+fi
+
+MODPATHSET="0";
+FREEBSD="1";
+;;
+
+NetBSD*)
+    echo " [*] OS Version: $OSVER"
+    echo "RANLIB = ranlib"		>> $CONFIGFILE
+    SHELL="/bin/sh"
+if [ "$STATIC" = "0" ]; then
+    echo  " [*] Enabling dynamic linking."
+    echo  "DYNOPT		= -rdynamic"  >> $CONFIGFILE
+fi
+;;
+
+*BSD*)
+    echo "RANLIB  = ranlib"               >> $CONFIGFILE
+;;
+
+HP-UX*)
+    echo "#define HPUX 1"		  >> $LIBVARSFILE
+    echo "RANLIB  = ranlib"               >> $CONFIGFILE
+;;
+
+IRIX*)
+    echo "#define ERESI_EXTSHELL      \"/usr/freeware/bin/bash\""               >> $VARSFILE
+
+if [ "$SHELLSET" != "1" ]; then
+    echo "#define ERESI_EXTSHELL      \"/usr/freeware/bin/bash\""               >> $VARSFILE
+    SHELLSET="1"
+fi
+    SHELL="/usr/freeware/bin/bash"
+    echo "#define IRIX 1" 		  >> $LIBVARSFILE
+    echo "RANLIB  = /usr/bin/ar -rs"      >> $CONFIGFILE
+    echo "CC = gcc"                       >> $CONFIGFILE
+;;
+
+Haiku*|BeOS*)
+   SHELL="/bin/sh"
+   echo "#define BEOS 1"		 >> $LIBVARSFILE
+   echo "RANLIB  = ranlib"               >> $CONFIGFILE
+   LPTHREAD=""
+   BEOS=1;
+;;
+
+*)
+
+if [ "$STATIC" = "0" ]; then
+    echo  " [*] Enabling dynamic linking."
+    echo  "DYNOPT                = -rdynamic"   >> $CONFIGFILE
+fi
+
+if [ "$ERESI_NET" = "1" ]; then
+    EXTRAOPT="$EXTRAOPT -lutil"
+    echo "EXTRAOPT = " $EXTRAOPT		>> $CONFIGFILE
+fi
+;;
+
+esac
+
+# Set default variables in case it was not precised
+
+if [ "$MODPATHSET" != "1" ]; then
+	echo "#define ERESI_MODPATH    \"$BASEPATH/share/eresi/\"" >> $VARSFILE
+fi
+
+if [ "$LIBPATHSET" != "1" ]; then
+    echo "#define ERESI_LIBPATH    \"/lib;/usr/lib;/usr/local/lib:$BASEPATH/lib/\"" >> $VARSFILE
+fi
+
+if [ "$TESTING" != "1" ]; then
+    echo "#define E2DBG_PATH    \"$BASEPATH/lib/\""  >> $VARSFILE
+fi
+
+if [ "$SLOGSET" != "1" ]; then
+    echo "#define ERESI_SLOG 0" 				>> $VARSFILE
+fi
+
+if [ "$SHELLSET" != "1" ]; then
+    echo "#define ERESI_EXTSHELL      \"/bin/bash\""		>> $VARSFILE
+fi
+
+if [ "$EDITORSET" != "1" ]; then
+    echo "#define ERESI_EDITOR      \"emacs\""			>> $VARSFILE
+fi
+
+if [ "$BUILDOP" != "1" ];  then
+    echo "BUILDOP = -DM32"					>> $CONFIGFILE
+fi
+
+echo " [*] Prefix:  " $PREFIX
+
+echo  " [*] Enabling libasm support"
+echo  "LDASMOPT	= -lasm"		>> $CONFIGFILE
+echo "LPTHREAD=	$LPTHREAD"		>> $CONFIGFILE
+echo "BITS = " $BITS			>> $CONFIGFILE
+echo "SHELL= " $SHELL			>> $CONFIGFILE
+
+if [ "$KERNSH" = "1" ]; then
+	echo "KERNSH = -DKERNSH"               		>> $CONFIGFILE
+	echo "KERNSHLIB32 = -L../libkernsh/ -lkernsh32" >> $CONFIGFILE
+	echo "KERNSHLIB64 = -L../libkernsh/ -lkernsh64" >> $CONFIGFILE
+	echo "KERNSHINC = -I../libkernsh/include" 	>> $CONFIGFILE
+	echo "KERNSHINCINC = -I../../libkernsh/include" >> $CONFIGFILE
+fi
+
+echo "##"							 > Makefile 
+echo "## Makefile "						>> Makefile
+echo "## "							>> Makefile
+echo "## Started on  Fri Dec  7 06:54:35 2001 jfv"		>> Makefile
+echo "## Automatically generated from the configure script"	>> Makefile
+echo "## "							>> Makefile
+echo ""								>> Makefile
+echo "include ./$CONFIGFILE " 					>> Makefile
+echo ""								>> Makefile
+echo "CC      = gcc "						>> Makefile
+echo "RM      = rm -f "						>> Makefile
+if which etags 2>/dev/null; then
+    echo "ETAGS   = etags "				        >> Makefile
+elif  which etags.emacs 2>/dev/null; then
+    echo "ETAGS   = etags.emacs "			        >> Makefile
+fi
+
+echo "CTAGS   = ctags "						>> Makefile
+echo "DESTDIR = $PREFIX"                       			>> Makefile
+echo "BUILD_TARGET = $BUILD_TARGET"				>> Makefile
+echo "MOD_TARGET = $MOD_TARGET"					>> Makefile
+
+if [ "$FREEBSD" = "1" ]; then
+echo "BASEPATH = \$(DESTDIR)/"				>> Makefile
+echo "MANPATH = \$(BASEPATH)/man"				>> Makefile
+
+elif [ "$BEOS" = "1" ]; then
+echo "BASEPATH = \$(DESTDIR)/"					>> Makefile
+echo "MANPATH = \$(BASEPATH)/man"				>> Makefile
+
+else
+echo "BASEPATH = \$(DESTDIR)/"				>> Makefile
+echo "MANPATH = \$(BASEPATH)/share/man"				>> Makefile
+fi
+
+echo "MODPATH = \$(BASEPATH)/share/elfsh/"			>> Makefile
+echo "BINPATH = \$(BASEPATH)/bin/"				>> Makefile
+echo "LIBPATH = \$(BASEPATH)/lib/"				>> Makefile
+
+echo "#define LIBPATH          \"$PREFIX/lib/\""	>> $VARSFILE
+
+echo "INCPATH = \$(BASEPATH)/include/"				>> Makefile
+echo "RM      = rm -f "                                		>> Makefile
+echo ""								>> Makefile
+echo "all     : world modules testsuite tags"			>> Makefile
+
+cat >> Makefile <<EOF
+
+sed -ie "s%TESTING_ROOT=.*%TESTING_ROOT=`pwd`/%" eresi-config
+
+ifdef NAME
+include  build/defs/dep-rules.def
+component:	dep-\$(NAME)
+else
+component:
+	@echo Please indicate which component by specifying a NAME option.
+	@echo gmake component NAME=component-name
+	@echo Component names are mostly subdirectories
+endif
+
+EOF
+
+echo "world   : "						>> Makefile
+echo "	@echo 'Building liballocproxy ..' "			>> Makefile
+echo "	@cd liballocproxy && \$(MAKE) "				>> Makefile
+echo "	@echo 'Liballoc-proxy has been built successfully.' "	>> Makefile
+echo "	@echo 'Building libaspect..' "			        >> Makefile
+echo "	@cd libaspect && \$(MAKE) \$(BUILD_TARGET)"		>> Makefile
+echo "	@echo 'Libaspect has been built successfully.' "	>> Makefile
+echo "	@echo 'Building libasm...' "				>> Makefile
+echo "	@cd libasm && sh configure "				>> Makefile
+echo "	@cd libasm && \$(MAKE) \$(BUILD_TARGET)"		>> Makefile
+echo "	@echo 'Libasm has been built successfully.' "		>> Makefile
+
+if [ "$KERNSH" = "1" ]; then
+echo "	@echo 'Building libkernsh...'                   "       >> Makefile
+echo "	@cd libkernsh && \$(MAKE) \$(BUILD_TARGET)      "       >> Makefile
+echo "	@echo 'Libkernsh has been built successfully.'  "       >> Makefile
+fi
+
+echo "	@echo 'Building libelfsh...' "				>> Makefile
+echo "	@cd libelfsh && \$(MAKE) \$(BUILD_TARGET)"		>> Makefile
+echo "	@echo 'Libelfsh has been built successfully.' "		>> Makefile
+
+echo "	@echo 'Building libetrace...' "				>> Makefile
+echo "	@cd libetrace && \$(MAKE) \$(BUILD_TARGET)"		>> Makefile
+echo "	@echo 'Libetrace has been built successfully.' "	>> Makefile
+
+echo "	@echo 'Building libedfmt...'                     "	>> Makefile
+echo "	@cd libedfmt && \$(MAKE) \$(BUILD_TARGET)        "	>> Makefile
+echo "	@echo 'Libedfmt has been built successfully.'    "	>> Makefile
+
+if [ "$ERESI_NET" = "1" ]; then
+
+echo "	@echo 'Building libdump...' "				>> Makefile
+echo "	@cd libdump && \$(MAKE) \$(BUILD_TARGET)"		>> Makefile
+echo "	@echo 'Libdump has been built successfully.' "		>> Makefile
+
+fi
+
+echo "	@echo 'Building libui...'			"      	>> Makefile	
+echo "	@cd libui && \$(MAKE) \$(BUILD_TARGET)		"	>> Makefile
+echo "	@echo 'Libui has been built successfully.' 	"	>> Makefile
+
+echo "	@echo 'Building libmjollnir...'			"      	>> Makefile
+echo "	@cd libmjollnir && \$(MAKE) \$(BUILD_TARGET)	"	>> Makefile
+echo "	@echo 'Libmjollnir has been built successfully.'"	>> Makefile
+
+echo "	@echo 'Building librevm...'			"      	>> Makefile
+echo "	@cd librevm && \$(MAKE) \$(BUILD_TARGET)	"	>> Makefile
+echo "	@echo 'Librevm has been built successfully.'"	        >> Makefile
+
+# If we compiled librevm with readline, we need to compile it a second
+# time without it, to be linked with libe2dbg in the embedded debugger
+if [ "$READLN" = "1" ]; then
+  echo "	test -f config.h && cp config.h config.back"    >> Makefile
+  echo "	cat $CONFIGFILE | grep -v READLN > t && mv t $CONFIGFILE" >> Makefile
+  echo "	@echo 'Rebuilding librevm/io/ without readline'">> Makefile
+  echo "	@cd librevm/io/ && \$(MAKE) clean	    "	>> Makefile
+  echo "	@cd librevm/io/ && \$(MAKE) \$(BUILD_TARGET)  "	>> Makefile
+  echo "	cp config.back config.h"                        >> Makefile
+  echo "	@echo 'Librevm has been rebuilt successfully.'"	>> Makefile
+fi
+
+echo "	@echo 'Building libstderesi...'			"      	>> Makefile
+echo "	@cd libstderesi && \$(MAKE) \$(BUILD_TARGET)	"	>> Makefile
+echo "	@echo 'Libstderesi has been built successfully.'"	>> Makefile
+
+echo "	@echo 'Building libe2dbg...'			"      	>> Makefile
+echo "	@cd libe2dbg && \$(MAKE) \$(BUILD_TARGET)	"	>> Makefile
+echo "	@echo 'Libe2dbg has been built successfully.'"	        >> Makefile
+
+echo "	@echo 'Building ELFsh ET_EXEC'			"	>> Makefile
+echo "	@cd elfsh && \$(MAKE)	\$(BUILD_TARGET)     	"       >> Makefile
+echo "	@echo 'ELFsh ET_EXEC has been built successfully.' "	>> Makefile
+echo ""								>> Makefile
+
+echo "	@echo 'Building E2dbg' "				>> Makefile
+echo "	@cd e2dbg && \$(MAKE) \$(BUILD_TARGET)	     	"       >> Makefile
+echo "	@echo 'E2dbg has been built successfully.' "		>> Makefile
+echo ""								>> Makefile
+
+echo "	@echo 'Building Etrace'				"	>> Makefile
+echo "	@cd etrace && \$(MAKE)	\$(BUILD_TARGET)     	"       >> Makefile
+echo "	@echo 'ETrace has been built successfully.' 	"	>> Makefile
+echo ""								>> Makefile
+
+echo "	@echo 'Building Evarista'			"	>> Makefile
+echo "	@cd evarista && \$(MAKE) \$(BUILD_TARGET)     	"       >> Makefile
+echo "	@echo 'Evarista has been built successfully.' 	"	>> Makefile
+echo ""								>> Makefile
+
+echo "	@echo 'Building libgdbwrap'			"	>> Makefile
+echo "	@cd libgdbwrap && \$(MAKE) \$(BUILD_TARGET)    	"       >> Makefile
+echo "	@echo 'libgdbwrap has been built successfully.'	"	>> Makefile
+echo ""								>> Makefile
+
+echo "	@echo 'Building Kedbg'			        "	>> Makefile
+echo "	@cd kedbg && \$(MAKE) \$(BUILD_TARGET)     	"       >> Makefile
+echo "	@echo 'Kedbg has been built successfully.' 	"	>> Makefile
+echo ""								>> Makefile
+
+if [ "$KERNSH" = "1" ]; then
+echo "	@echo 'Building kernsh...'                      "       >> Makefile
+echo "	@cd kernsh && \$(MAKE) \$(BUILD_TARGET)         "       >> Makefile
+echo "	@echo 'Kernsh has been built successfully.'     "       >> Makefile
+fi
+
+if [ ! -e ~/.eresirc ]; then
+echo "	@cp doc/eresirc.example ~/.eresirc "                    >> Makefile
+fi
+if [ ! -e ~/.elfshrc ]; then
+echo "	@ln -sf ~/.eresirc ~/.elfshrc"				>> Makefile
+fi
+if [ ! -e ~/.e2dbgrc ]; then
+echo "	@ln -sf ~/.eresirc ~/.e2dbgrc"				>> Makefile
+fi
+if [ ! -e ~/.etracerc ]; then
+echo "	@ln -sf ~/.eresirc ~/.etracerc"				>> Makefile
+fi
+if [ ! -e ~/.kernshrc ]; then
+echo "	@ln -sf ~/.eresirc ~/.kernshrc"				>> Makefile
+fi
+
+echo ".PHONY: modules "						>> Makefile
+echo "modules: "						>> Makefile
+echo "	@echo 'Building ERESI modules...' "			>> Makefile
+echo "	@cd modules && \$(MAKE) -s \$(BUILD_TARGET)"		>> Makefile
+echo "	@echo 'ERESI modules built successfully.' "		>> Makefile
+
+if [ "$TESTING" = "1" ]; then
+echo ""								>> Makefile
+echo ".PHONY: testsuite "					>> Makefile
+echo "testsuite:"						>> Makefile
+echo "	\$(shell source env.sh)"			       	>> Makefile
+echo "	@echo 'Building ERESI testsuite...' "			>> Makefile
+echo "	cd testsuite && \$(MAKE) -s \$(BUILD_TARGET)"		>> Makefile 
+echo "	@echo 'ERESI testsuite built successfully.' "		>> Makefile  
+fi
+
+if [ "$TESTING" = "1" ]; then
+  echo "	@echo"						>> Makefile
+  echo "	@echo Now source env.sh"			>> Makefile
+  echo "	@echo"						>> Makefile
+fi
+
+# Create links for 64bits mode
+echo "install64 :"						       >> Makefile
+echo "	@ln -sf \$(BINPATH)elfsh64         \$(BINPATH)elfsh"	       >> Makefile
+echo "	@ln -sf \$(BINPATH)e2dbg64         \$(BINPATH)e2dbg"	       >> Makefile
+echo "	@ln -sf \$(BINPATH)etrace64        \$(BINPATH)etrace"	       >> Makefile
+echo "	@ln -sf \$(BINPATH)evarista64      \$(BINPATH)evarista"	       >> Makefile
+if [ "$KERNSH" = "1" ]; then
+echo "	@ln -sf \$(BINPATH)kernsh64        \$(BINPATH)kernsh"         >> Makefile
+fi
+echo "	@ln -sf \$(BINPATH)kedbg64         \$(BINPATH)kedbg"          >> Makefile
+echo "	@ln -sf \$(BINPATH)eresi-config64  \$(BINPATH)eresi-config"   >> Makefile
+
+echo "	@ln -sf \$(LIBPATH)libaspect64.a   \$(LIBPATH)libaspect.a"    >> Makefile
+echo "	@ln -sf \$(LIBPATH)libelfsh64.a    \$(LIBPATH)libelfsh.a"     >> Makefile
+echo "	@ln -sf \$(LIBPATH)libetrace64.a   \$(LIBPATH)libetrace.a  "  >> Makefile
+echo "	@ln -sf \$(LIBPATH)libe2dbg64.a    \$(LIBPATH)libe2dbg.a"     >> Makefile
+echo "	@ln -sf \$(LIBPATH)libmjollnir64.a \$(LIBPATH)libmjollnir.a"  >> Makefile
+echo "	@ln -sf \$(LIBPATH)librevm64.a     \$(LIBPATH)librevm.a"      >> Makefile
+echo "	@ln -sf \$(LIBPATH)libstderesi64.a \$(LIBPATH)libstderesi.a"  >> Makefile
+echo "	@ln -sf \$(LIBPATH)libedfmt64.a    \$(LIBPATH)libedfmt.a"     >> Makefile
+echo "	@ln -sf \$(LIBPATH)libui64.a       \$(LIBPATH)libui.a"        >> Makefile
+if [ "$KERNSH" = "1" ]; then
+echo "	@ln -sf \$(LIBPATH)libkernsh64.a   \$(LIBPATH)libkernsh.a"   >> Makefile
+fi
+echo "	@ln -sf \$(LIBPATH)libgdbwrap64.a  \$(LIBPATH)libgdbwrap.a"   >> Makefile
+
+echo "	@ln -sf \$(LIBPATH)libaspect64.so   \$(LIBPATH)libaspect.so"   >> Makefile
+echo "	@ln -sf \$(LIBPATH)libelfsh64.so    \$(LIBPATH)libelfsh.so"    >> Makefile
+echo "	@ln -sf \$(LIBPATH)libetrace64.so    \$(LIBPATH)libetrace.so"  >> Makefile
+echo "	@ln -sf \$(LIBPATH)libe2dbg64.so    \$(LIBPATH)libe2dbg.so"    >> Makefile
+echo "	@ln -sf \$(LIBPATH)libmjollnir64.so \$(LIBPATH)libmjollnir.so" >> Makefile
+echo "	@ln -sf \$(LIBPATH)librevm64.so     \$(LIBPATH)librevm.so"     >> Makefile
+echo "	@ln -sf \$(LIBPATH)libstderesi64.so \$(LIBPATH)libstderesi.so" >> Makefile
+echo "	@ln -sf \$(LIBPATH)libedfmt64.so    \$(LIBPATH)libedfmt.so"    >> Makefile
+echo "	@ln -sf \$(LIBPATH)libui64.so       \$(LIBPATH)libui.so"       >> Makefile
+if [ "$KERNSH" = "1" ]; then
+echo "	@ln -sf \$(LIBPATH)libkernsh64.so   \$(LIBPATH)libkernsh.so"   >> Makefile
+fi
+echo "	@ln -sf \$(LIBPATH)libgdbwrap64.so  \$(LIBPATH)libgdbwrap.so"  >> Makefile
+
+echo "install : prepareDir #mod_install "			>> Makefile
+echo "	@cp elfsh/elfsh?? \$(BINPATH)/ "			>> Makefile
+echo "	@cp e2dbg/e2dbg?? \$(BINPATH)/ "			>> Makefile
+echo "	@cp etrace/etrace?? \$(BINPATH)/ "			>> Makefile
+echo "	@cp evarista/evarista?? \$(BINPATH)/ "			>> Makefile
+if [ "$KERNSH" = "1" ]; then
+echo "	@cp kernsh/kernsh?? \$(BINPATH)/ "			>> Makefile
+fi
+echo "	@cp kedbg/kedbg?? \$(BINPATH)/ "			>> Makefile
+echo "	@cp eresi-config?? \$(BINPATH)/ "			>> Makefile
+
+if [ "$KERNSH" = "1" ]; then
+echo "	@cp libkernsh/libkernsh*.a libkernsh/libkernsh*.so \$(LIBPATH) " >> Makefile
+fi
+echo "	@cp libgdbwrap/libgdbwrap*.a libgdbwrap/libgdbwrap*.so \$(LIBPATH) " >> Makefile
+echo "	@cp libaspect/libaspect*.a libaspect/libaspect*.so \$(LIBPATH) " >> Makefile
+echo "	@cp liballocproxy/liballocproxy.a \$(LIBPATH) "		>> Makefile
+echo "	@cp libelfsh/libelfsh*.a libelfsh/libelfsh*.so \$(LIBPATH) " >> Makefile
+echo "	@cp libetrace/libetrace*.a libetrace/libetrace*.so \$(LIBPATH) " >> Makefile
+echo "	@cp libe2dbg/libe2dbg*.a libe2dbg/libe2dbg*.so \$(LIBPATH) " >> Makefile
+echo "	@cp libasm/libasm*.a libasm/libasm*.so \$(LIBPATH) "	>> Makefile
+echo "	@cp libmjollnir/libmjollnir*.a \$(LIBPATH) "		>> Makefile
+echo "	@cp libmjollnir/libmjollnir*.so \$(LIBPATH) "		>> Makefile
+echo "	@cp librevm/librevm*.a librevm/librevm*.so \$(LIBPATH)" >> Makefile
+echo "	@cp libstderesi/libstderesi*.a libstderesi/libstderesi*.so \$(LIBPATH)" >> Makefile
+echo "	@cp libedfmt/libedfmt*.a libedfmt/libedfmt*.so \$(LIBPATH) " >> Makefile
+echo "	@cp libui/libui*.a libui/libui*.so \$(LIBPATH) "	>> Makefile
+
+if [ "$KERNSH" = "1" ]; then
+echo "	@cp libkernsh/libkernsh*.a libkernsh/libkernsh*.so \$(LIBPATH) " >> Makefile
+echo "	@cp kernsh/kernsh?? \$(BINPATH)/ "                      >> Makefile
+fi
+
+# Create links
+echo "	@ln -sf \$(BINPATH)elfsh32         \$(BINPATH)elfsh"	      >> Makefile
+echo "	@ln -sf \$(BINPATH)e2dbg32         \$(BINPATH)e2dbg"	      >> Makefile
+echo "	@ln -sf \$(BINPATH)etrace32        \$(BINPATH)etrace"	      >> Makefile
+echo "	@ln -sf \$(BINPATH)evarista32      \$(BINPATH)evarista"	      >> Makefile
+if [ "$KERNSH" = "1" ]; then
+echo "	@ln -sf \$(BINPATH)kernsh32        \$(BINPATH)kernsh"         >> Makefile
+fi
+echo "	@ln -sf \$(BINPATH)kedbg32         \$(BINPATH)kedbg"          >> Makefile
+echo "	@ln -sf \$(BINPATH)eresi-config32  \$(BINPATH)eresi-config"   >> Makefile
+
+echo "	@ln -sf \$(LIBPATH)libaspect32.a   \$(LIBPATH)libaspect.a"    >> Makefile
+echo "	@ln -sf \$(LIBPATH)libelfsh32.a    \$(LIBPATH)libelfsh.a"     >> Makefile
+echo "	@ln -sf \$(LIBPATH)libetrace32.a    \$(LIBPATH)libetrace.a"     >> Makefile
+echo "	@ln -sf \$(LIBPATH)libe2dbg32.a    \$(LIBPATH)libe2dbg.a"     >> Makefile
+echo "	@ln -sf \$(LIBPATH)libmjollnir32.a \$(LIBPATH)libmjollnir.a"  >> Makefile
+echo "	@ln -sf \$(LIBPATH)librevm32.a     \$(LIBPATH)librevm.a"      >> Makefile
+echo "	@ln -sf \$(LIBPATH)libstderesi32.a \$(LIBPATH)libstderesi.a"      >> Makefile
+echo "	@ln -sf \$(LIBPATH)libedfmt32.a    \$(LIBPATH)libedfmt.a"     >> Makefile
+echo "	@ln -sf \$(LIBPATH)libui32.a       \$(LIBPATH)libui.a"        >> Makefile
+if [ "$KERNSH" = "1" ]; then
+echo "	@ln -sf \$(LIBPATH)libkernsh32.a   \$(LIBPATH)libkernsh.a"   >> Makefile
+fi
+echo "	@ln -sf \$(LIBPATH)libgdbwrap32.a  \$(LIBPATH)libgdbwrap.a"   >> Makefile
+
+echo "	@ln -sf \$(LIBPATH)libaspect32.so   \$(LIBPATH)libaspect.so"   >> Makefile
+echo "	@ln -sf \$(LIBPATH)libelfsh32.so    \$(LIBPATH)libelfsh.so"    >> Makefile
+echo "	@ln -sf \$(LIBPATH)libetrace32.so    \$(LIBPATH)libetrace.so"  >> Makefile
+echo "	@ln -sf \$(LIBPATH)libe2dbg32.so    \$(LIBPATH)libe2dbg.so"    >> Makefile
+echo "	@ln -sf \$(LIBPATH)libmjollnir32.so \$(LIBPATH)libmjollnir.so" >> Makefile
+echo "	@ln -sf \$(LIBPATH)librevm32.so     \$(LIBPATH)librevm.so"     >> Makefile
+echo "	@ln -sf \$(LIBPATH)libstderesi32.so \$(LIBPATH)libstderesi.so" >> Makefile
+echo "	@ln -sf \$(LIBPATH)libedfmt32.so    \$(LIBPATH)libedfmt.so"    >> Makefile
+echo "	@ln -sf \$(LIBPATH)libui32.so       \$(LIBPATH)libui.so"       >> Makefile
+if [ "$KERNSH" = "1" ]; then
+echo "	@ln -sf \$(LIBPATH)libkernsh32.so   \$(LIBPATH)libkernsh.so"   >> Makefile
+fi
+echo "	@ln -sf \$(LIBPATH)libgdbwrap32.so  \$(LIBPATH)libgdbwrap.so"  >> Makefile
+
+# Install headers
+echo "	@cp -R libelfsh/include/* \$(INCPATH) "			>> Makefile
+echo "	@cp -R libetrace/include/* \$(INCPATH) "			>> Makefile
+echo "	@cp libasm/include/*.h \$(INCPATH)"		        >> Makefile
+echo "	@cp libaspect/include/*.h \$(INCPATH)"		        >> Makefile
+echo "	@cp librevm/include/*.h \$(INCPATH)"		        >> Makefile
+echo "	@cp libstderesi/include/*.h \$(INCPATH)"		>> Makefile
+echo "	@cp libedfmt/include/*.h \$(INCPATH) "			>> Makefile
+echo "	@cp libui/include/libui.h \$(INCPATH) "			>> Makefile
+echo "	@cp libmjollnir/include/libmjollnir*.h \$(INCPATH) "	>> Makefile
+if [ "$KERNSH" = "1" ]; then
+echo "	@cp libkernsh/include/libkernsh.h \$(INCPATH) "         >> Makefile
+fi
+
+# Install mans
+echo "	@cp doc/eresi.1 \$(MANPATH)/man1/ "			>> Makefile
+echo "	@chmod 644 \$(MANPATH)/man1/eresi.1 "			>> Makefile
+
+# Put rights
+echo "	@chmod 755 \$(BINPATH)elfsh?? "				>> Makefile
+echo "	@chmod 755 \$(BINPATH)e2dbg??"				>> Makefile
+echo "	@chmod 755 \$(BINPATH)etrace?? "		        >> Makefile
+echo "	@chmod 755 \$(BINPATH)evarista?? "		        >> Makefile
+if [ "$KERNSH" = "1" ]; then
+echo "	@chmod 755 \$(BINPATH)kernsh?? "                        >> Makefile
+echo "	@chmod 644 \$(LIBPATH)libkernsh*.so "                   >> Makefile
+echo "	@chmod 644 \$(INCPATH)libkernsh*.h "                    >> Makefile
+fi
+echo "	@chmod 644 \$(LIBPATH)libelfsh*.so "			>> Makefile
+echo "	@chmod 644 \$(LIBPATH)libetrace*.so "			>> Makefile
+echo "	@chmod 644 \$(LIBPATH)libe2dbg*.so "			>> Makefile
+echo "	@chmod 644 \$(LIBPATH)libaspect*.so "			>> Makefile
+echo "	@chmod 644 \$(LIBPATH)libaspect*.a "			>> Makefile
+echo "	@chmod 644 \$(LIBPATH)librevm*.so "			>> Makefile
+echo "	@chmod 644 \$(LIBPATH)librevm*.a "			>> Makefile
+echo "	@chmod 644 \$(LIBPATH)libstderesi*.so "			>> Makefile
+echo "	@chmod 644 \$(LIBPATH)libstderesi*.a "			>> Makefile
+echo "	@chmod 644 \$(LIBPATH)libedfmt*.so "			>> Makefile
+echo "	@chmod 644 \$(LIBPATH)libedfmt*.a "			>> Makefile
+echo "	@chmod 644 \$(LIBPATH)libui*.so "			>> Makefile
+echo "	@chmod 644 \$(LIBPATH)libui*.a "			>> Makefile
+echo "	@chmod 644 \$(INCPATH)libui.h "				>> Makefile
+echo "	@chmod 644 \$(INCPATH)libelfsh*.h "			>> Makefile
+echo "	@chmod 644 \$(LIBPATH)libelfsh*.a "			>> Makefile
+echo "	@chmod 644 \$(LIBPATH)libasm*.a "			>> Makefile
+echo "	@chmod 644 \$(INCPATH)libedfmt*.h "			>> Makefile
+echo "	@chmod 644 \$(INCPATH)libasm*.h "			>> Makefile
+echo "	@chmod 644 \$(INCPATH)libmjollnir.h "			>> Makefile
+echo "	@chmod 644 \$(INCPATH)libaspect*.h "			>> Makefile
+echo "	@chmod 644 \$(INCPATH)librevm*.h "			>> Makefile
+echo "	@chmod 644 \$(INCPATH)libstderesi*.h "			>> Makefile
+echo ""	                        				>> Makefile
+echo "prepareDir: " 						>> Makefile
+echo "	@mkdir -p \$(BINPATH) || true"  			>> Makefile
+echo "	@mkdir -p \$(LIBPATH) || true"  			>> Makefile
+echo "	@mkdir -p \$(INCPATH) || true"  			>> Makefile
+echo "	@mkdir -p \$(MANPATH)/man1/ || true"    	        >> Makefile
+echo "	@mkdir -p \$(MODPATH) || true"  			>> Makefile
+
+if [ "$FREEBSD" = "1" ]; then
+    echo "	@ldconfig -R"                                   >> Makefile
+fi
+
+echo "	@echo 'ELFsh, E2dbg, Etrace, Evarista, Libelfsh, Libe2dbg, \\" >> Makefile
+echo "Libmjollnir, Libasm, Libedfmt, Libui, Librevm, Libstderesi \\"   >> Makefile
+echo "and Libaspect installed successfully .'"			       >> Makefile
+echo "	@echo Default installation is 32bits : make install64 if requested" >> Makefile
+
+echo "mod_install: "						>> Makefile
+echo "	@mkdir \$(MODPATH) 2>/dev/null || true "		>> Makefile
+echo "	@cp modules/*.so \$(MODPATH) "				>> Makefile
+echo "	@chmod -R 755 \$(MODPATH) "				>> Makefile
+echo ""								>> Makefile
+
+echo "uninstall: "						>> Makefile
+echo "	rm -f  \$(BINPATH)/elfsh*"				>> Makefile
+echo "	rm -f  \$(BINPATH)/e2dbg*"				>> Makefile
+echo "	rm -f  \$(BINPATH)/etrace*"				>> Makefile
+echo "	rm -f  \$(BINPATH)/evarista*"				>> Makefile
+echo "	rm -f  \$(BINPATH)/eresi-config*"			>> Makefile
+echo "	rm -f  \$(BINPATH)/kedbg*"				>> Makefile
+echo "	rm -f  \$(LIBPATH)/libelfsh*"				>> Makefile
+echo "	rm -f  \$(LIBPATH)/libetrace*"				>> Makefile
+echo "	rm -f  \$(LIBPATH)/libe2dbg*"				>> Makefile
+echo "	rm -f  \$(LIBPATH)/libui*"				>> Makefile
+echo "	rm -f  \$(LIBPATH)/liballocproxy*"			>> Makefile
+echo "	rm -f  \$(LIBPATH)/libmjollnir*"			>> Makefile
+echo "	rm -f  \$(LIBPATH)/libaspect*"			        >> Makefile
+echo "	rm -f  \$(LIBPATH)/librevm*"			        >> Makefile
+echo "	rm -f  \$(LIBPATH)/libstderesi*"			>> Makefile
+echo "	rm -f  \$(LIBPATH)/libedfmt*"				>> Makefile
+echo "	rm -f  \$(LIBPATH)/libasm*"				>> Makefile
+echo "	rm -f  \$(LIBPATH)/libgdbwrap*"				>> Makefile
+echo "	rm -f  \$(LIBPATH)/libmalloc-e2dbg*"			>> Makefile
+echo "	rm -fr \$(MODPATH) "					>> Makefile
+echo "	rm -f  \$(MANPATH)/man1/elfsh.1 "			>> Makefile
+echo "	rm -f  \$(INCPATH)/libasm*.h "				>> Makefile
+echo "	rm -f  \$(INCPATH)/libmjollnir*.h "		        >> Makefile
+echo "	rm -f  \$(INCPATH)/libui.h "				>> Makefile
+echo "	rm -f  \$(INCPATH)/aproxy.h "				>> Makefile
+echo "	rm -fr \$(INCPATH)/libelfsh*"				>> Makefile
+echo "	rm -fr \$(INCPATH)/libaspect*"				>> Makefile
+echo "	rm -fr \$(INCPATH)/librevm*"				>> Makefile
+echo "	rm -fr \$(INCPATH)/libstderesi*"         		>> Makefile
+echo "	rm -fr \$(INCPATH)/libedfmt*"				>> Makefile
+echo "	rm -fr \$(INCPATH)/libetrace*"				>> Makefile
+echo "	rm -fr \$(INCPATH)/revm*"				>> Makefile
+echo "	rm -f \$(INCPATH)/libvars.h"				>> Makefile
+if [ "$KERNSH" = "1" ]; then
+echo "	rm -f  \$(BINPATH)/kernsh*"                             >> Makefile
+echo "	rm -f  \$(LIBPATH)/libkernsh*"                          >> Makefile
+echo "	rm -f  \$(INCPATH)/libkernsh*"                          >> Makefile
+fi
+
+echo "	@echo 'ELFsh, E2dbg, Etrace, Evarista, Libelfsh, \\"    >> Makefile
+echo "Libmjollnir, Libaspect, Libedfmt, Libe2dbg, Libui, \\"    >> Makefile
+echo "Libstderesi and Libasm uninstalled successfully' "	>> Makefile
+echo ""								>> Makefile
+
+echo "clean   : cleandoc "					>> Makefile
+echo "	@echo 'Cleaning tree ...' "				>> Makefile
+echo "	cd elfsh     && \$(MAKE) -s clean "			>> Makefile
+echo "	cd e2dbg     && \$(MAKE) -s clean "			>> Makefile
+echo "	cd etrace    && \$(MAKE) -s clean "			>> Makefile
+echo "	cd evarista  && \$(MAKE) -s clean "			>> Makefile
+echo "	cd libgdbwrap  && \$(MAKE) -s clean "			>> Makefile
+echo "	cd kedbg  && \$(MAKE) -s clean "			>> Makefile
+if [ "$KERNSH" = "1" ]; then
+echo "	cd kernsh && \$(MAKE) -s clean"                         >> Makefile
+echo "	cd libkernsh && \$(MAKE) -s clean"                      >> Makefile
+fi
+echo "	cd libelfsh  && \$(MAKE) -s clean "			>> Makefile
+echo "	cd libetrace && \$(MAKE) -s clean "			>> Makefile
+echo "	cd libe2dbg  && \$(MAKE) -s clean "			>> Makefile
+echo "	cd librevm   && \$(MAKE) -s clean "			>> Makefile
+echo "	cd libstderesi && \$(MAKE) -s clean "			>> Makefile
+echo "	cd libedfmt  && \$(MAKE) -s clean "			>> Makefile
+echo "	cd libaspect && \$(MAKE) -s clean "			>> Makefile
+echo "	cd libui     && \$(MAKE) -s clean "			>> Makefile
+echo "	cd libmjollnir && \$(MAKE) -s clean "		        >> Makefile
+echo "	cd libasm    && sh configure "				>> Makefile
+echo "	cd libasm    && \$(MAKE) -s clean "			>> Makefile
+echo "	cd liballocproxy && \$(MAKE) -s clean "			>> Makefile
+echo "	cd libdump   && \$(MAKE) -s clean "			>> Makefile
+echo "	cd modules   && \$(MAKE) -s clean "			>> Makefile
+echo "	cd testsuite && \$(MAKE) -s clean "			>> Makefile   
+echo "	@echo 'Tree cleaned .' "				>> Makefile
+echo ""								>> Makefile
+
+echo "fclean  : cleandoc "					>> Makefile
+echo "	@echo 'Fcleaning tree ...' "				>> Makefile
+echo "	cd elfsh     && \$(MAKE) -s fclean "			>> Makefile
+echo "	cd e2dbg     && \$(MAKE) -s fclean "			>> Makefile
+echo "	cd etrace    && \$(MAKE) -s fclean "			>> Makefile
+echo "	cd evarista  && \$(MAKE) -s fclean "			>> Makefile
+echo "	cd kedbg  && \$(MAKE) -s fclean "			>> Makefile
+if [ "$KERNSH" = "1" ]; then
+echo "	cd kernsh && \$(MAKE) -s fclean"                        >> Makefile
+echo "	cd libkernsh && \$(MAKE) -s fclean"                     >> Makefile
+fi
+echo "	cd libelfsh  && \$(MAKE) -s fclean "			>> Makefile
+echo "	cd libetrace && \$(MAKE) -s fclean "			>> Makefile
+echo "	cd libe2dbg  && \$(MAKE) -s fclean "			>> Makefile
+echo "	cd libasm    && sh configure "				>> Makefile
+echo "	cd libasm    && \$(MAKE) -s fclean "			>> Makefile
+echo "	cd librevm   && \$(MAKE) -s fclean "			>> Makefile
+echo "	cd libstderesi && \$(MAKE) -s fclean "			>> Makefile
+echo "	cd libedfmt  && \$(MAKE) -s fclean "			>> Makefile
+echo "	cd libaspect && \$(MAKE) -s fclean "			>> Makefile
+echo "	cd liballocproxy && \$(MAKE) -s fclean "	        >> Makefile
+echo "	cd libmjollnir && \$(MAKE) -s fclean "		        >> Makefile
+echo "	cd libdump   && \$(MAKE) -s fclean "			>> Makefile
+echo "	cd libui     && \$(MAKE) -s fclean "			>> Makefile
+echo "	cd libgdbwrap  && \$(MAKE) -s fclean "			>> Makefile
+echo "	cd modules   && \$(MAKE) -s fclean "			>> Makefile
+echo "	cd testsuite && \$(MAKE) -s fclean "			>> Makefile   
+
+echo "	@echo 'Tree cleaned .' "				>> Makefile
+echo ""								>> Makefile
+
+echo "cleandoc: "						>> Makefile
+echo "	@rm -f *~ *\# \#* .\#* "				>> Makefile
+echo "	@rm -f doc/*~ doc/*\# doc/\#* doc/.\#* "		>> Makefile
+echo "	@rm -f doc/research/*~ doc/research/*\# "		>> Makefile
+echo "	@rm -f doc/research/\#* doc/research/.\#* "		>> Makefile
+echo ""								>> Makefile
+
+echo "tags    : "						>> Makefile
+echo "	@echo Doing tags ... "					>> Makefile
+if [ "$ETAGS" = "1" ]; then
+echo "	@\$(ETAGS) elfsh/*.c elfsh/include/*.h libelfsh/*.c \\"	>> Makefile
+echo "	libelfsh/include/*.h e2dbg/include/*.h \\"		>> Makefile
+echo "	libetrace/*.c libetrace/include/*.h \\"                 >> Makefile
+echo "	modules/*.c liballocproxy/*.c libdump/*.c e2dbg/*.c \\"	>> Makefile
+echo "	libasm/src/*.c liballocproxy/include/*.h \\"		>> Makefile
+echo "	libaspect/*.c libe2dbg/*/*.c libaspect/include/*.h \\"  >> Makefile
+echo "	librevm/*/*.c librevm/include/*.h libe2dbg/include/*.h \\" >> Makefile
+echo "	libedfmt/*.c libedfmt/include/*.h \\"			>> Makefile
+echo "	libasm/src/arch/ia32/*.c libmjollnir/src/*.c \\"	>> Makefile
+echo "	libasm/src/arch/arm/*.c libasm/src/arch/sparc/*.c \\"	>> Makefile
+echo "	libasm/src/arch/mips/*.c libasm/include/*.h \\"		>> Makefile
+echo "	libui/*.c libui/include/*.h \\" 			>> Makefile
+echo "	libdump/include/*.h libmjollnir/include/*.h \\"		>> Makefile
+echo "  etrace/*.c evarista/*.c libstderesi/*/*.c \\"		>> Makefile
+echo "  libstderesi/include/*.h \\"                             >> Makefile
+echo "  libgdbwrap/include/*.h \\"                              >> Makefile
+echo "  libgdbwrap/*.c \\"                                      >> Makefile
+echo "  kedbg/include/*.h \\"                                   >> Makefile
+echo "  kedbg/*.c \\"                                           >> Makefile
+
+if [ "$KERNSH" = "1" ]; then
+echo "  kernsh/*.c kernsh/include/*.h \\"                       >> Makefile
+echo "  libkernsh/*/*.c libkernsh/include/*.h \\"               >> Makefile
+fi
+echo "  etrace/include/*.h evarista/include/*.h "		>> Makefile
+fi
+
+if [ "$CTAGS" = "1" ]; then
+echo "	@\$(CTAGS) e2dbg/*.c e2dbg/include/*.h \\"		>> Makefile
+echo "	libasm/include/*.h libasm/src/*.c \\"   		>> Makefile
+echo "  libasm/src/arch/ia32/*.c libasm/src/arch/*/handlers/*.c \\">> Makefile
+echo "  libasm/src/arch/sparc/*.c\\"    			>> Makefile
+echo "  libe2dbg/*/*.c libe2dbg/include/*.h \\"			>> Makefile
+echo "	libdump/include/*.h libdump/*.c\\"			>> Makefile
+echo "  libelfsh/include/*.h \\"    				>> Makefile
+echo "  libetrace/include/*.h \\"    				>> Makefile
+echo "  libetrace/*.c \\" 					>> Makefile
+echo "	libaspect/*.c libaspect/include/*.h \\"		        >> Makefile
+echo "	librevm/*/*.c librevm/include/*.h \\"		        >> Makefile
+echo "	libedfmt/*.c libedfmt/include/*.h \\"			>> Makefile
+echo "  libelfsh/include/libelfsh/*.h\\"    			>> Makefile
+echo "  libelfsh/*.c \\" 					>> Makefile
+echo "  liballocproxy/*.c liballocproxy/include/*.h \\" 	>> Makefile
+echo "  libmjollnir/include/*.h libmjollnir/src/*.c \\" 	>> Makefile
+echo "  libstderesi/include/*.h libstderesi/*/*.c \\"		>> Makefile
+echo "  libui/*.c libui/include/*.h \\" 			>> Makefile
+echo "  elfsh/*.c elfsh/include/*.h \\"				>> Makefile
+echo "  etrace/*.c etrace/include/*.h \\"			>> Makefile
+echo "  libgdbwrap/include/*.h \\"                              >> Makefile
+echo "  libgdbwrap/*.c \\"                                      >> Makefile
+echo "  kedbg/include/*.h \\"                                   >> Makefile
+echo "  kedbg/*.c \\"                                           >> Makefile
+
+if [ "$KERNSH" = "1" ]; then
+echo "  kernsh/*.c kernsh/include/*.h \\"                       >> Makefile
+echo "  libkernsh/*.c libkernsh/include/*.h \\"                 >> Makefile
+fi
+echo "  evarista/*.c evarista/include/*.h "			>> Makefile
+echo ""								>> Makefile
+fi
+
+echo "info    : "						>> Makefile
+echo "	@echo '###############' TOTAL '###############'"	>> Makefile
+echo "	@wc -l elfsh/*.c libelfsh/*.c libelfsh/include/*.h \\"	>> Makefile
+echo "	libetrace/*.c libetrace/include/*.h                \\"	>> Makefile
+echo "	elfsh/include/*.h modules/*.c libasm/src/*.c \\"	>> Makefile
+echo "  libasm/src/arch/*/*.c e2dbg/*.c e2dbg/include/*.h \\"   >> Makefile
+echo "  libasm/src/arch/*/*/*.c                           \\"   >> Makefile
+echo "  libaspect/*.c libmjollnir/src/*.c libaspect/*/*.h \\"   >> Makefile
+echo "  librevm/*/*.c librevm/include/*.h libdump/*.c \\"	>> Makefile
+echo "  libstderesi/*/*.c libstderesi/include/*.h  \\"	        >> Makefile
+echo "  libe2dbg/*/*.c libe2dbg/include/*.h \\"			>> Makefile
+echo "  libmjollnir/include/*.h libui/include/*.h libui/*.c \\" >> Makefile
+echo "  libedfmt/include/*.h libelfsh/include/*/*.h \\"         >> Makefile
+echo "  libasm/src/arch/*/handlers/*.c libedfmt/*.c \\"         >> Makefile
+echo "  evarista/*.c evarista/include/*.h"                      >> Makefile
+echo "	@echo '#########' TOTAL WITHOUT HEADERS '#######'"	>> Makefile
+echo "	@wc -l elfsh/*.c libelfsh/*.c modules/*.c e2dbg/*.c \\"	>> Makefile
+echo "	libaspect/*.c libasm/src/arch/ia32/*.c libui/*.c\\"	>> Makefile
+echo "  libasm/src/*.c libasm/src/arch/sparc/*.c libe2dbg/*/*.c \\" >> Makefile
+echo "	librevm/*/*.c libmjollnir/src/*.c libdump/*.c \\"	>> Makefile
+echo "  libasm/src/arch/*/handlers/*.c libedfmt/*.c \\"		>> Makefile
+echo "  evarista/*.c libstderesi/*/*.c"				>> Makefile
+echo "	@echo '############' LIBASPECT ONLY '############'"	>> Makefile
+echo "	@wc -l libaspect/*.c "					>> Makefile
+echo "	@echo '#############' LIBELFSH ONLY '#######'"	        >> Makefile
+echo "	@wc -l libelfsh/*.c "					>> Makefile
+echo "	@echo '#############' LIBETRACE ONLY '#######'"	        >> Makefile
+echo "	@wc -l libetrace/*.c "					>> Makefile
+echo "	@echo '#############' LIBE2DBG ONLY '#######'"	        >> Makefile
+echo "	@wc -l libe2dbg/*/*.c "					>> Makefile
+echo "	@echo '###############' LIBASM ONLY '##########'"	>> Makefile
+echo "	@wc -l libasm/src/*.c libasm/src/arch/*/*.c \\"		>> Makefile
+echo "  libasm/src/arch/*/*/*.c                              "  >> Makefile
+echo "	@echo '###############' LIBMJOLLNIR ONLY '##########'"	>> Makefile
+echo "	@wc -l libmjollnir/src/*.c "				>> Makefile
+echo "	@echo '###############' LIBREVM ONLY '##########'"	>> Makefile
+echo "	@wc -l librevm/*/*.c "					>> Makefile
+echo "	@echo '###############' LIBSTDERESI ONLY '##########'"	>> Makefile
+echo "	@wc -l libstderesi/*/*.c "				>> Makefile
+echo "	@echo '###############' LIBEDFMT ONLY '##########'"	>> Makefile
+echo "	wc -l libedfmt/*.c "					>> Makefile
+echo "	@echo '###############' LIBUI ONLY '##########'"	>> Makefile
+echo "	@wc -l libui/*.c "					>> Makefile
+echo "	@echo '###############' LIBDUMP ONLY '##########'"	>> Makefile
+echo "	@wc -l libdump/*.c "					>> Makefile
+echo "	@echo '###############' ELFSH only '#############'"	>> Makefile
+echo "	@wc -l elfsh/*.c "					>> Makefile
+echo "	@echo '###############' E2DBG only '#############'"	>> Makefile
+echo "	@wc -l e2dbg/*.c "				        >> Makefile
+echo "	@echo '###############' ETRACE only '#############'"	>> Makefile
+echo "	@wc -l etrace/*.c "					>> Makefile
+echo "	@echo '###############' EVARISTA only '#############'"	>> Makefile
+echo "	@wc -l evarista/*.c "					>> Makefile
+echo "	@echo '###############' MODULES ONLY '########'"	>> Makefile
+echo "	@wc -l modules/*.c "					>> Makefile
+echo ""								>> Makefile
+
+echo "docs:"							>> Makefile
+echo "	doxygen doc/doxygen.conf"				>> Makefile
+echo "	#(cd libasm && \$(MAKE) docs)"				>> Makefile
+echo "	#(cd libelfsh && \$(MAKE) docs)"			>> Makefile
+echo "	#(cd librevm && \$(MAKE) docs)"				>> Makefile
+echo "	#(cd libstderesi && \$(MAKE) docs)"			>> Makefile
+echo "	#(cd libmjollnir && \$(MAKE) docs)"			>> Makefile
+echo "	#(cd libui && \$(MAKE) docs)"				>> Makefile
+echo "	#(cd libedfmt && \$(MAKE) docs)"			>> Makefile
+if [ "$KERNSH" = "1" ]; then
+echo "	#(cd libkernsh && \$(MAKE) docs)"			>> Makefile
+fi
+echo
+echo " Now make && make install"
+echo 
+
+

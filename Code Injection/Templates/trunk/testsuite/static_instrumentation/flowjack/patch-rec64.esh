@@ -1,0 +1,14 @@
+#!../../../elfsh/elfsh32
+## 
+## patch.esh in testsuite for ERESI
+## 
+
+load recur64
+analyse
+load infected.64.o
+switch 1
+reladd 1 2
+flowjack subfunc hijacked
+save recur64.hijacked
+
+quit

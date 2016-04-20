@@ -1,0 +1,33 @@
+#!../../elfsh/elfsh32
+
+load /bin/ls
+analyse
+print main
+exec sleep 10
+
+set $a 1
+set $b 3
+set $c 5
+set $d 7
+set $e ($a+$c-$b)*$d/2
+print $a $b $c $d $e
+
+cmp $b $d
+cmp $b $d-$a
+cmp $b-$a+$c $d
+cmp $b+$c $d-$a
+cmp $b*2 $d-$a
+
+set $f 0xFF<4
+print $f
+
+set $f 0xFF0>4
+print $f
+
+quiet
+foreach $i of 0 until 10
+print At $i : main+$i contains byte value *(main+$i) 
+forend
+verb
+
+quit
